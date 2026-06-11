@@ -26,10 +26,29 @@ def _configure_logging() -> None:
     )
 
 
+def _preload_ml_stack() -> None:
+    """Import the heavy ML extensions on the MAIN thread, eagerly.
+
+    Loading numpy/ctranslate2 C extensions lazily inside a worker thread of a
+    console-less, pipe-stdio child process deadlocks in the Windows loader
+    (observed: numpy multiarray DLL init frozen indefinitely). Importing here,
+    before the worker pool exists, makes later in-thread use safe. Failure is
+    non-fatal: transcription then reports a structured error instead.
+    """
+    import logging
+
+    try:
+        import ctranslate2  # noqa: F401  (pulls in numpy)
+        import faster_whisper  # noqa: F401
+    except Exception as exc:  # noqa: BLE001 - degraded mode, not a crash
+        logging.getLogger(__name__).warning("ML stack preload failed: %s", exc)
+
+
 def main() -> int:
     """Run the RPC server until stdin closes."""
     _configure_stdio()
     _configure_logging()
+    _preload_ml_stack()
     from speakspec.handlers import HANDLERS
     from speakspec.rpc import RpcServer
 

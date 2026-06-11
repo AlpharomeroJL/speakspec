@@ -3,3 +3,5 @@
 faster-whisper>=1.2,<2
 pydantic>=2.13,<3
 httpx>=0.28,<1
+python-docx>=1.1
+# GPU transcription (optional): nvidia-cublas-cu12 + nvidia-cudnn-cu12

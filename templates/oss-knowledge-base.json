@@ -1,6 +1,18 @@
 {
-  "comment": "Curated, community-editable knowledge base of well-maintained OSS libraries by domain. Injected into Stage 2 so the model recommends mature libraries instead of custom builds. Versions are minimums known-good at last edit.",
-  "version": 1,
+  "comment": "Curated, community-editable knowledge base injected into Stage 2: best-practice OSS libraries by domain, plus the language selection matrix (technical fit only - language familiarity is never an input; an explicit user preference overrides the matrix and is flagged). Versions are minimums known-good at last edit.",
+  "version": 2,
+  "language_selection_matrix": [
+    { "constraints": "Single binary + low latency + no ML", "language": "Rust", "confidence": "high" },
+    { "constraints": "Single binary + fast ship + simple logic", "language": "Go", "confidence": "high" },
+    { "constraints": "ML pipeline or data processing", "language": "Python", "confidence": "high" },
+    { "constraints": "Browser extension (any)", "language": "TypeScript", "confidence": "high - no alternative" },
+    { "constraints": "Serverless + cold start sensitive", "language": "Go or TypeScript", "confidence": "medium - depends on ecosystem needs" },
+    { "constraints": "CLI tool shipping to developers", "language": "Go", "confidence": "high" },
+    { "constraints": "Rapid API + LLM integration", "language": "Python or TypeScript", "confidence": "medium - depends on front-end integration" },
+    { "constraints": "Embedded or edge device", "language": "Rust (preferred) or C", "confidence": "high" },
+    { "constraints": "Data pipeline + batch processing", "language": "Python", "confidence": "high" },
+    { "constraints": "Mobile (cross-platform)", "language": "React Native or Flutter", "confidence": "medium - depends on performance needs" }
+  ],
   "domains": {
     "web_api": [
       { "name": "FastAPI", "language": "Python", "version": "0.115", "use_for": "HTTP APIs with validation and OpenAPI for free" },

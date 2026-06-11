@@ -2,23 +2,28 @@
   "presets": [
     {
       "name": "Solo MVP",
-      "optimize_for": "Fastest path to a working product for one builder: boring proven tech, one deployable unit, near-zero operations, easy to abandon or grow."
+      "optimize_for": "Fastest path to a working product for one builder: boring proven tech, one deployable unit, near-zero operations, easy to abandon or grow.",
+      "default_language_tendency": "Go or Rust"
     },
     {
       "name": "API service",
-      "optimize_for": "A long-lived network service: clean API boundaries, observability from day one, horizontal deployability, schema-versioned persistence."
+      "optimize_for": "A long-lived network service: clean API boundaries, observability from day one, horizontal deployability, schema-versioned persistence.",
+      "default_language_tendency": "Go, Rust, or Python"
     },
     {
       "name": "CLI tool",
-      "optimize_for": "A single trivially-installable binary or package: instant startup, no server components, great help text, scriptable output."
+      "optimize_for": "A single trivially-installable binary or package: instant startup, no server components, great help text, scriptable output.",
+      "default_language_tendency": "Go"
     },
     {
       "name": "Browser extension",
-      "optimize_for": "Manifest V3 reality: minimal permissions, store-review friendliness, no remote code, graceful degradation when offline."
+      "optimize_for": "Manifest V3 reality: minimal permissions, store-review friendliness, no remote code, graceful degradation when offline.",
+      "default_language_tendency": "TypeScript"
     },
     {
       "name": "Data pipeline",
-      "optimize_for": "Idempotent re-runnable stages, explicit schema evolution, observable progress, cheap backfills, failure isolation between stages."
+      "optimize_for": "Idempotent re-runnable stages, explicit schema evolution, observable progress, cheap backfills, failure isolation between stages.",
+      "default_language_tendency": "Python"
     }
   ]
 }

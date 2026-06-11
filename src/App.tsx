@@ -1,80 +1,116 @@
 /**
- * Phase 2 shell: proves the full IPC round trip on screen.
- *
- * Later phases replace this with the recording / review / pipeline UI; the
- * IPC plumbing it exercises stays identical.
+ * Speakspec main window: a linear wizard over the pipeline.
+ * record -> transcribing -> transcript -> constraints -> interview ->
+ * generating -> results. Sidecar health is surfaced persistently.
  */
-import { createSignal, onCleanup, onMount } from "solid-js";
-import {
-  EVENTS,
-  frontendLog,
-  onEvent,
-  pingSidecar,
-  type PingResult,
-  type SidecarStatusPayload,
-  type SidecarStreamPayload,
-} from "./lib/ipc";
+import { createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import { EVENTS, onEvent, type SidecarStatusPayload, type SidecarStreamPayload } from "./lib/ipc";
+import { state } from "./state";
+import Recorder from "./components/Recorder";
+import TranscriptReview from "./components/TranscriptReview";
+import ConstraintReview from "./components/ConstraintReview";
+import Interview from "./components/Interview";
+import Generating from "./components/Generating";
+import Results from "./components/Results";
+import Library from "./components/Library";
+import Setup from "./components/Setup";
+import { listModels } from "./lib/ipc";
 import "./App.css";
 
 function App() {
-  const [status, setStatus] = createSignal<string>("waiting for sidecar…");
-  const [progressLine, setProgressLine] = createSignal<string>("");
-  const [pingResult, setPingResult] = createSignal<string>("");
+  const [sidecar, setSidecar] = createSignal<SidecarStatusPayload | null>(null);
+  const [asrNote, setAsrNote] = createSignal("");
+  const [showLibrary, setShowLibrary] = createSignal(false);
+  const [needsSetup, setNeedsSetup] = createSignal<boolean | null>(null);
   const unlisteners: Array<() => void> = [];
 
-  async function runPing(): Promise<boolean> {
-    setPingResult("pinging…");
+  async function checkModels() {
     try {
-      const result: PingResult = await pingSidecar({ hello: "from-frontend" });
-      const rendered = JSON.stringify(result);
-      setPingResult(rendered);
-      // Land the proof in the Rust dev console for automated verification.
-      await frontendLog(`FRONTEND RECEIVED PING RESULT: ${rendered}`);
-      return true;
-    } catch (err) {
-      setPingResult(`ping failed: ${JSON.stringify(err)}`);
-      return false;
+      const models = await listModels();
+      setNeedsSetup(models.models.length === 0);
+    } catch {
+      setNeedsSetup(true); // ollama unreachable or sidecar down -> setup guidance
     }
   }
 
   onMount(async () => {
     unlisteners.push(
       await onEvent<SidecarStatusPayload>(EVENTS.sidecarStatus, (p) => {
-        setStatus(`${p.status}${p.message ? ` — ${p.message}` : ""}`);
-        if (p.status === "ready") void runPing();
+        setSidecar(p);
+        if (p.status === "ready") void checkModels();
       }),
     );
+    void checkModels();
     unlisteners.push(
-      await onEvent<SidecarStreamPayload>(EVENTS.sidecarProgress, (p) => {
-        const line = JSON.stringify(p.data);
-        setProgressLine(line);
-        void frontendLog(`FRONTEND RECEIVED PROGRESS EVENT: ${line}`);
+      await onEvent<SidecarStreamPayload>(EVENTS.asrProgress, (p) => {
+        const data = p.data as { state?: string; fraction?: number };
+        if (data.state === "transcribing" && typeof data.fraction === "number") {
+          setAsrNote(`transcribing ${(data.fraction * 100).toFixed(0)}%`);
+        } else if (data.state === "loading-model") {
+          setAsrNote("loading speech model…");
+        } else if (data.state === "gpu-oom-fallback") {
+          setAsrNote("GPU out of memory — continuing on CPU");
+        }
       }),
     );
-    // The "ready" status may fire before these subscriptions attach, so also
-    // poll until the first ping lands.
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    for (let attempt = 0; attempt < 30; attempt++) {
-      if (await runPing()) break;
-      await sleep(1000);
-    }
   });
-
   onCleanup(() => unlisteners.forEach((u) => u()));
 
   return (
     <main class="container">
-      <h1>Speakspec</h1>
-      <p>Local-first voice-to-architecture. Phase 2 IPC shell.</p>
-      <section>
-        <h2>Sidecar</h2>
-        <p data-testid="sidecar-status">status: {status()}</p>
-        <p data-testid="sidecar-progress">last progress event: {progressLine() || "—"}</p>
-        <button type="button" onClick={() => void runPing()}>
-          Ping sidecar
+      <header class="row gap">
+        <h1>Speakspec</h1>
+        <span class="tagline">voice → architecture → AGENTS.md</span>
+        <span class="spacer" />
+        <button type="button" data-testid="library-toggle" onClick={() => setShowLibrary(!showLibrary())}>
+          Library
         </button>
-        <pre data-testid="ping-result">{pingResult()}</pre>
-      </section>
+        <Show when={sidecar() && sidecar()!.status !== "ready"}>
+          <span class="sidecar-warning" title={sidecar()?.message ?? ""}>
+            AI engine: {sidecar()?.status}
+          </span>
+        </Show>
+      </header>
+
+      <Show when={showLibrary()}>
+        <Library onClose={() => setShowLibrary(false)} />
+      </Show>
+
+      <Show when={state.error}>
+        <div class="errorbox" data-testid="error">
+          {state.error}
+        </div>
+      </Show>
+
+      <Switch>
+        <Match when={state.step === "record" && needsSetup() === true}>
+          <Setup onReady={() => setNeedsSetup(false)} />
+        </Match>
+        <Match when={state.step === "record"}>
+          <Recorder />
+        </Match>
+        <Match when={state.step === "transcribing"}>
+          <section class="panel">
+            <h2>Transcribing…</h2>
+            <p class="hint">{asrNote() || "loading speech model…"}</p>
+          </section>
+        </Match>
+        <Match when={state.step === "transcript"}>
+          <TranscriptReview />
+        </Match>
+        <Match when={state.step === "constraints"}>
+          <ConstraintReview />
+        </Match>
+        <Match when={state.step === "interview"}>
+          <Interview />
+        </Match>
+        <Match when={state.step === "generating"}>
+          <Generating />
+        </Match>
+        <Match when={state.step === "results"}>
+          <Results />
+        </Match>
+      </Switch>
     </main>
   );
 }
