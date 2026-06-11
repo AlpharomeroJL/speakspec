@@ -7,6 +7,7 @@
 
 mod commands;
 mod error;
+pub mod pipeline_types;
 pub mod sidecar;
 
 use anyhow::Context;

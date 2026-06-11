@@ -1,0 +1,38 @@
+{
+  "intent_summary": "The developer wants a small web service that lets a private group of friends share home recipes, plan a weekly menu together, and automatically produce a consolidated grocery list. Members add recipes with ingredients and steps, tag them, and mark dietary notes. Each week the group drags recipes onto a shared calendar; the service merges the ingredient lists for the chosen week, normalizes units, and groups items by supermarket aisle. The developer explicitly wants invite-only groups rather than public accounts, expects at most a few dozen users total, and wants hosting to be as cheap as possible because this is a hobby project. They mentioned wanting email reminders the evening before a shopping day. Nothing was said about mobile apps; the browser is assumed to be the only client. The most important quality is that the grocery list merge is correct, since duplicated or wrongly converted quantities would make the tool useless in practice.",
+  "core_intent": "Let a private group of friends plan weekly menus and get a merged grocery list.",
+  "analogies": [
+    {
+      "comparison": "like a shared Notion table but it understands ingredients",
+      "implication": "Structured ingredient data with unit-aware merging matters more than free-form documents."
+    }
+  ],
+  "named_components": ["recipe store", "weekly menu calendar", "grocery list merger", "email reminder job"],
+  "constraints": [
+    { "category": "deployment_target", "value": "cheapest possible single-server or serverless hosting", "source": "stated", "confidence": "high" },
+    { "category": "team_size", "value": "solo hobby developer", "source": "stated", "confidence": "high" },
+    { "category": "scale_expectation", "value": "a few dozen users, single private group instances", "source": "stated", "confidence": "high" },
+    { "category": "latency_requirement", "value": "interactive web app; no strict latency target", "source": "inferred", "confidence": "medium" },
+    { "category": "ops_complexity_budget", "value": "near zero; hobby project maintained occasionally", "source": "inferred", "confidence": "high" },
+    { "category": "ship_timeline", "value": "no deadline stated", "source": "stated", "confidence": "low" },
+    { "category": "external_integrations", "value": "outbound email for reminders", "source": "stated", "confidence": "high" },
+    { "category": "language_preference", "value": "none stated", "source": "stated", "confidence": "high" },
+    { "category": "persistence_requirements", "value": "relational data: recipes, ingredients, menus, groups", "source": "inferred", "confidence": "high" },
+    { "category": "security_posture", "value": "invite-only private groups; no public signup", "source": "stated", "confidence": "high" },
+    { "category": "quality_goals", "value": "correctness of unit-aware grocery merge above all", "source": "stated", "confidence": "high" }
+  ],
+  "open_questions": [
+    "How should conflicting manual edits to a generated grocery list be handled when the menu changes afterwards?",
+    "Is offline access or printing of the grocery list required?"
+  ],
+  "interview_questions": [
+    {
+      "question": "When two recipes use incompatible units for the same ingredient (e.g. '1 bunch parsley' vs '20 g parsley'), should the merger guess a conversion or list both lines?",
+      "why_it_matters": "Determines whether the ingredient model needs a curated conversion table or a simpler literal merge, which is the riskiest correctness decision."
+    },
+    {
+      "question": "Do reminders need to be reliable enough to justify a hosted email service, or is best-effort from the app server fine?",
+      "why_it_matters": "Decides between adding a third-party email integration versus a simple SMTP send, which changes the deployment shape."
+    }
+  ]
+}

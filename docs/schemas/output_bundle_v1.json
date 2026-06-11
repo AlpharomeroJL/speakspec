@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "speakspec/output_bundle_v1.json",
+  "title": "Stage 3 Output Bundle",
+  "description": "All export artifacts generated from the Stage 2 architecture spec. Stage 3 of the Speakspec pipeline. agents_md is the hero artifact and is hard-capped at 200 lines by a downstream quality gate. Mermaid diagrams are raw source; the validate-and-repair loop runs AFTER this schema is produced.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agents_md",
+    "claude_md_shim",
+    "adrs",
+    "diagrams",
+    "file_tree",
+    "first_pr"
+  ],
+  "properties": {
+    "agents_md": {
+      "type": "string",
+      "description": "The primary agent context file. Lean, command-first, under 200 lines. FIXED section order: (1) one-line project description, (2) tech stack with exact versions, (3) exact commands build/test/lint/run/deploy, (4) 3-5 key directories with one-line descriptions and file pointers, (5) hard constraints, (6) do-not block, (7) first tasks in build order, (8) open questions. No prose descriptions of files that appear in the file tree. No restating what a linter/compiler enforces."
+    },
+    "claude_md_shim": {
+      "type": "string",
+      "description": "Claude Code compatibility shim. Contains '@AGENTS.md' and nothing else unless a genuine Claude-Code-specific override is required."
+    },
+    "adrs": {
+      "type": "array",
+      "description": "One MADR-format ADR per architecture_decision in Stage 2. Order matches Stage 2 decision order.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["filename", "markdown"],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "pattern": "^docs/adr/[0-9]{4}-[a-z0-9-]+\\.md$",
+            "description": "e.g. docs/adr/0001-use-rust-for-core.md"
+          },
+          "markdown": {
+            "type": "string",
+            "description": "MADR body with sections in order: Status (always 'Proposed'), Context, Decision, Confidence, Consequences, Alternatives considered."
+          }
+        }
+      }
+    },
+    "diagrams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "er", "component", "c4_context", "c4_container"],
+      "description": "Raw Mermaid source for each diagram type. Theme-neutral: NO custom theme/init directives. Each must be valid Mermaid 11 syntax. Avoid unescaped parentheses/quotes inside node labels and fullwidth/Chinese punctuation.",
+      "properties": {
+        "sequence":     { "type": "string", "description": "sequenceDiagram: main user flow end-to-end." },
+        "er":           { "type": "string", "description": "erDiagram: data model entities, fields, types, relationships." },
+        "component":    { "type": "string", "description": "graph TD: internal component boundaries and data flow." },
+        "c4_context":   { "type": "string", "description": "C4Context: system, its users, and all external systems named in the spec." },
+        "c4_container": { "type": "string", "description": "C4Container: major deployable units and their communication paths." }
+      }
+    },
+    "file_tree": {
+      "type": "string",
+      "description": "Suggested directory structure as a monospace tree. Every non-obvious file has an inline comment. Matches the recommended stack's conventions."
+    },
+    "first_pr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "scope", "tasks", "time_estimate", "out_of_scope"],
+      "properties": {
+        "title": { "type": "string" },
+        "scope": { "type": "string", "description": "Skeleton only. No business logic. Produces a compiling skeleton when executed." },
+        "tasks": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "time_estimate": { "type": "string" },
+        "out_of_scope": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

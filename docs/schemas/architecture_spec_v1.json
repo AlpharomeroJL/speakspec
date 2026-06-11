@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "speakspec/architecture_spec_v1.json",
+  "title": "Stage 2 Architecture Specification Output",
+  "description": "Opinionated architecture spec generated from Stage 1 constraints plus interview-back answers. Stage 2 of the Speakspec pipeline. All fields required. Every architecture_decision MUST include at least one ruled_out alternative.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "system_overview",
+    "recommended_language",
+    "quality_goals",
+    "architecture_decisions",
+    "oss_components",
+    "what_not_to_build",
+    "risk_flags",
+    "open_questions",
+    "complexity",
+    "constraints"
+  ],
+  "properties": {
+    "system_overview": {
+      "type": "string",
+      "description": "2-4 sentence description of the system as designed.",
+      "minLength": 40
+    },
+    "recommended_language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "confidence", "rationale", "overridden_by_user"],
+      "properties": {
+        "language": { "type": "string" },
+        "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+        "rationale": { "type": "string", "description": "Chosen on technical fit only. Never on familiarity." },
+        "overridden_by_user": {
+          "type": "boolean",
+          "description": "True only if the user explicitly stated a language preference that overrode the technical-fit choice."
+        }
+      }
+    },
+    "quality_goals": {
+      "type": "array",
+      "description": "Performance, availability, maintainability, security goals derived from constraints (arc42-style).",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["goal", "driver"],
+        "properties": {
+          "goal": { "type": "string" },
+          "driver": { "type": "string", "description": "Which constraint motivates this goal." }
+        }
+      }
+    },
+    "architecture_decisions": {
+      "type": "array",
+      "description": "The core IP. Each significant decision with rationale, confidence, and ruled-out alternatives. Maps 1:1 to a generated ADR file.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "chosen_option", "confidence", "rationale", "consequences", "ruled_out"],
+        "properties": {
+          "title": { "type": "string", "description": "Short decision title, becomes the ADR slug." },
+          "chosen_option": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "rationale": { "type": "string" },
+          "consequences": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["positive", "negative"],
+            "properties": {
+              "positive": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+              "negative": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+            }
+          },
+          "ruled_out": {
+            "type": "array",
+            "minItems": 1,
+            "description": "At least one rejected alternative. Neutral output is the lowest-value output.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["option", "rejection_reason"],
+              "properties": {
+                "option": { "type": "string" },
+                "rejection_reason": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "oss_components": {
+      "type": "array",
+      "description": "Existing well-maintained OSS libraries to use instead of building. Checked against the OSS knowledge base before recommending custom work.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "version", "purpose", "why_selected", "do_not_build"],
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string", "description": "Pinned or minimum version. Use 'latest-stable' only if a specific version is genuinely unknown." },
+          "purpose": { "type": "string" },
+          "why_selected": { "type": "string" },
+          "do_not_build": { "type": "boolean", "const": true }
+        }
+      }
+    },
+    "what_not_to_build": {
+      "type": "array",
+      "description": "Explicit list of things NOT to build for this problem type. Specific, not generic.",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "risk_flags": {
+      "type": "array",
+      "description": "Issues the user did not mention but a senior architect would flag proactively.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["risk", "severity", "mitigation"],
+        "properties": {
+          "risk": { "type": "string" },
+          "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+          "mitigation": { "type": "string" }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "description": "Ambiguities to resolve before building. Low-confidence decisions must surface a specific question here.",
+      "items": { "type": "string" }
+    },
+    "complexity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rating", "time_estimate", "key_drivers"],
+      "properties": {
+        "rating": { "type": "string", "enum": ["S", "M", "L", "XL"] },
+        "time_estimate": { "type": "string", "description": "Rough solo-builder estimate, e.g. '3-5 days to first working slice'." },
+        "key_drivers": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "description": "Hard technical constraints that MUST appear verbatim in the agent context file.",
+      "items": { "type": "string" }
+    }
+  }
+}

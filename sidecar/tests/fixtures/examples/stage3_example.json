@@ -1,0 +1,29 @@
+{
+  "agents_md": "# Menu Planner\n\nInvite-only weekly menu planning with a unit-aware merged grocery list.\n\n## Tech stack\n- Python 3.12, FastAPI 0.115, Jinja2 3.1, SQLite (stdlib sqlite3), pint 0.24\n\n## Commands\n- build: `pip install -r requirements.txt`\n- test: `pytest`\n- lint: `ruff check .`\n- run: `uvicorn app.main:app --reload`\n- deploy: `fly deploy`\n\n## Key directories\n- `app/merge/` — unit-aware grocery merge; start at `app/merge/engine.py`\n- `app/web/` — routes and templates; start at `app/web/routes.py`\n- `app/models/` — SQLite schema and queries; start at `app/models/db.py`\n\n## Hard constraints\n- One process serves everything; no service splits\n- Invite-only groups; no public signup\n- Grocery merge must never silently produce wrong quantities\n\n## Do not\n- Do not add an SPA build chain\n- Do not guess unit conversions outside the curated table\n\n## First tasks\n1. Scaffold FastAPI app with one health route\n2. Define SQLite schema for groups, recipes, ingredients, menus\n3. Implement literal merge (identical units only) with tests\n\n## Open questions\n- Should manual grocery-list edits survive menu regeneration?\n",
+  "claude_md_shim": "@AGENTS.md\n",
+  "adrs": [
+    {
+      "filename": "docs/adr/0001-single-server-rendered-web-app.md",
+      "markdown": "# Single server-rendered web app\n\n## Status\nProposed\n\n## Context\nA few dozen users, one solo maintainer, near-zero ops budget.\n\n## Decision\nOne FastAPI + server-rendered templates monolith serves pages, API, and the reminder scheduler.\n\n## Confidence\nHigh — the constraints point one way with no significant tradeoff.\n\n## Consequences\n### Positive\n- One deployable unit to host cheaply\n- No client build pipeline to maintain\n### Negative\n- A future native mobile client would need an API extraction\n\n## Alternatives considered\n- SPA frontend + separate API service — rejected: doubles the deployable surface and adds a JS build chain for a browser-only hobby tool.\n"
+    }
+  ],
+  "diagrams": {
+    "sequence": "sequenceDiagram\n  actor Member\n  participant Web as Web App\n  participant DB as SQLite\n  Member->>Web: drag recipe onto week\n  Web->>DB: save menu entry\n  Member->>Web: request grocery list\n  Web->>DB: load week ingredients\n  Web->>Web: merge quantities\n  Web-->>Member: grouped grocery list",
+    "er": "erDiagram\n  GROUP ||--o{ MEMBER : has\n  GROUP ||--o{ RECIPE : owns\n  RECIPE ||--o{ INGREDIENT : contains\n  GROUP ||--o{ MENU_WEEK : plans\n  MENU_WEEK ||--o{ MENU_ENTRY : schedules\n  MENU_ENTRY }o--|| RECIPE : uses",
+    "component": "graph TD\n  WebRoutes[Web routes] --> MergeEngine[Merge engine]\n  WebRoutes --> Store[SQLite store]\n  MergeEngine --> Conversions[Conversion table]\n  Scheduler[Reminder scheduler] --> Store\n  Scheduler --> Mailer[Email provider client]",
+    "c4_context": "C4Context\n  title Menu Planner context\n  Person(member, \"Group member\")\n  System(planner, \"Menu Planner\", \"Weekly menus and grocery lists\")\n  System_Ext(email, \"Email provider\", \"Sends reminders\")\n  Rel(member, planner, \"Plans menus\")\n  Rel(planner, email, \"Sends reminders via\")",
+    "c4_container": "C4Container\n  title Menu Planner containers\n  Person(member, \"Group member\")\n  Container(web, \"Web app\", \"FastAPI\", \"Pages, API, scheduler\")\n  ContainerDb(db, \"Database\", \"SQLite\", \"Recipes, menus, groups\")\n  System_Ext(email, \"Email provider\")\n  Rel(member, web, \"Uses\", \"HTTPS\")\n  Rel(web, db, \"Reads and writes\")\n  Rel(web, email, \"Sends reminders\", \"HTTPS\")"
+  },
+  "file_tree": "menu-planner/\n├── app/\n│   ├── main.py            # FastAPI entry; mounts routes and scheduler\n│   ├── merge/\n│   │   ├── engine.py      # literal-first merge; the correctness core\n│   │   └── conversions.py # curated food unit table\n│   ├── models/\n│   │   └── db.py          # schema + queries\n│   └── web/\n│       ├── routes.py\n│       └── templates/\n├── tests/\n│   └── test_merge.py      # merge engine golden cases\n└── requirements.txt",
+  "first_pr": {
+    "title": "Skeleton: FastAPI app, schema, empty merge engine",
+    "scope": "Compiling skeleton only: app boots, health route answers, schema creates, merge engine exists with one passing literal-merge test. No menus UI, no reminders.",
+    "tasks": [
+      "Scaffold FastAPI app with health route",
+      "Create SQLite schema for groups, recipes, ingredients, menus",
+      "Add merge engine module with literal merge of identical units and one test"
+    ],
+    "time_estimate": "half a day",
+    "out_of_scope": ["reminder emails", "invite flow", "unit conversions beyond identical units"]
+  }
+}

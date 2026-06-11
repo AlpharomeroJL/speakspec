@@ -1,0 +1,75 @@
+{
+  "system_overview": "A small invite-only web service for a private group of friends to store recipes, plan weekly menus on a shared calendar, and generate a unit-aware merged grocery list. A single server-rendered web app with a relational store and one nightly reminder job keeps operations near zero.",
+  "recommended_language": {
+    "language": "Python",
+    "confidence": "medium",
+    "rationale": "Dozens of users and near-zero ops budget make raw performance irrelevant; the hard part is unit-aware ingredient merging, where Python's mature parsing and quantity libraries (e.g. pint) remove the riskiest custom code. Chosen on technical fit to the merge problem, not familiarity.",
+    "overridden_by_user": false
+  },
+  "quality_goals": [
+    { "goal": "Grocery merge is always correct or visibly conservative (never silently wrong)", "driver": "quality_goals: correctness of unit-aware merge above all" },
+    { "goal": "Runs unattended for months on one cheap box", "driver": "ops_complexity_budget: near zero" }
+  ],
+  "architecture_decisions": [
+    {
+      "title": "Single server-rendered web app",
+      "chosen_option": "One FastAPI + server-rendered templates monolith",
+      "confidence": "high",
+      "rationale": "A few dozen users and a solo maintainer make any service split pure overhead; one process serves pages, API, and the reminder scheduler.",
+      "consequences": {
+        "positive": ["One deployable unit to host cheaply", "No client build pipeline to maintain"],
+        "negative": ["A future native mobile client would need an API extraction"]
+      },
+      "ruled_out": [
+        { "option": "SPA frontend + separate API service", "rejection_reason": "Doubles the deployable surface and adds a JS build chain for a browser-only hobby tool with no stated interactivity needs." }
+      ]
+    },
+    {
+      "title": "Literal-first ingredient merge with curated conversions",
+      "chosen_option": "Merge identical units literally; convert only via a checked-in conversion table; list incompatibles side by side",
+      "confidence": "medium",
+      "rationale": "Silent unit guessing is the main correctness risk; a conservative merge with explicit conversions keeps wrong quantities out of the list.",
+      "consequences": {
+        "positive": ["Merge errors become visible duplicates instead of wrong amounts", "Conversion table grows with real usage"],
+        "negative": ["Early lists show occasional duplicate lines until the table fills in"]
+      },
+      "ruled_out": [
+        { "option": "LLM-based ingredient normalization", "rejection_reason": "Non-deterministic output is unacceptable for the one feature whose correctness the user named as critical." }
+      ]
+    }
+  ],
+  "oss_components": [
+    {
+      "name": "pint",
+      "version": "0.24",
+      "purpose": "Unit parsing and conversion for ingredient quantities",
+      "why_selected": "Mature, widely used quantity library; replaces the riskiest custom code in the system",
+      "do_not_build": true
+    }
+  ],
+  "what_not_to_build": [
+    "A custom unit-conversion engine (use pint plus a small curated food table)",
+    "User-facing public signup, password reset flows, or OAuth — invite links cover the stated security posture",
+    "A mobile app or offline sync layer nobody asked for"
+  ],
+  "risk_flags": [
+    {
+      "risk": "Email deliverability from a hobby server lands reminders in spam",
+      "severity": "medium",
+      "mitigation": "Send through a free-tier transactional email provider instead of raw SMTP from the app box."
+    }
+  ],
+  "open_questions": [
+    "Should manual grocery-list edits survive menu changes (merge regeneration policy)?"
+  ],
+  "complexity": {
+    "rating": "S",
+    "time_estimate": "3-5 days to first working slice",
+    "key_drivers": ["Unit-aware merge correctness", "Invite-only auth without accounts infrastructure"]
+  },
+  "constraints": [
+    "Single cheap deployment target; one process must serve everything",
+    "Invite-only groups; no public signup",
+    "Grocery merge must never silently produce wrong quantities"
+  ]
+}
