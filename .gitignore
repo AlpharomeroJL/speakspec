@@ -22,3 +22,5 @@ mermaid_corpus_output2.txt
 mermaid_corpus_err2.txt
 agents_gate_output2.txt
 agents_gate_err2.txt
+template_check_output.txt
+template_check_err.txt
