@@ -96,6 +96,28 @@ def test_run_stage_recovers_from_semantic_failure() -> None:
     assert "language_preference" in client.calls[1]["user"]
 
 
+def test_stage2_semantic_check_enforces_stated_language() -> None:
+    from speakspec.pipeline import semantic_check, stated_language
+    from speakspec.schemas import ArchitectureSpec
+
+    stage2 = json.loads(
+        (FIXTURES / "examples" / "stage2_example.json").read_text(encoding="utf-8")
+    )
+    parsed = ArchitectureSpec.model_validate(stage2)  # recommends Python
+
+    no_pref = {"constraints": [{"category": "language_preference", "value": "none stated"}]}
+    assert stated_language(no_pref["constraints"]) is None
+    semantic_check(2, parsed, no_pref)  # no preference -> no constraint to honor
+
+    stated_rust = {"constraints": [{"category": "language_preference", "value": "Rust"}]}
+    assert stated_language(stated_rust["constraints"]) == "Rust"
+    with pytest.raises(ValueError, match="must be honored"):
+        semantic_check(2, parsed, stated_rust)
+
+    stated_python = {"constraints": [{"category": "language_preference", "value": "python"}]}
+    semantic_check(2, parsed, stated_python)  # matches the recommendation
+
+
 def test_choose_model_prefers_config_then_tiers() -> None:
     installed = [
         {"name": "llama2:7b", "size": 4_000_000_000},

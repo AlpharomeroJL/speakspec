@@ -12,3 +12,7 @@ __pycache__/
 .speakspec-dev/
 *.egg-info/
 pipeline_run_output.txt
+mermaid_corpus_output.txt
+mermaid_corpus_err.txt
+sidecar/tests/out/
+sidecar/tests/fixtures/tts_sample.wav

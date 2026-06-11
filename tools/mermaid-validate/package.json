@@ -1,0 +1,11 @@
+{
+  "name": "speakspec-mermaid-validate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "NDJSON stdin/stdout service validating Mermaid 11 sources with the real parser.",
+  "dependencies": {
+    "jsdom": "^25.0.1",
+    "mermaid": "^11.4.0"
+  }
+}

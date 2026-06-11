@@ -44,7 +44,18 @@ def size_num_ctx(stage: int, system: str, user: str) -> int:
     return max(config["num_ctx_min"], min(rounded, config["num_ctx_max"]))
 
 
-def semantic_check(stage: int, parsed: BaseModel) -> None:
+def stated_language(constraints: list[dict[str, Any]] | None) -> str | None:
+    """Return the explicitly stated language preference, if any."""
+    for constraint in constraints or []:
+        if constraint.get("category") != "language_preference":
+            continue
+        value = str(constraint.get("value", "")).strip()
+        if value and value.lower() not in ("none stated", "none", "null", "n/a"):
+            return value
+    return None
+
+
+def semantic_check(stage: int, parsed: BaseModel, context: dict[str, Any] | None = None) -> None:
     """Stage rules the JSON schema cannot express. Raises ``ValueError``."""
     if stage == 1 and isinstance(parsed, ConstraintExtraction):
         for constraint in parsed.constraints:
@@ -53,6 +64,18 @@ def semantic_check(stage: int, parsed: BaseModel) -> None:
                     "constraints: language_preference may never have source='inferred'. "
                     "If the speaker did not explicitly name a language, set value to "
                     "'none stated' and source to 'stated'."
+                )
+    if stage == 2 and context is not None:
+        preferred = stated_language(context.get("constraints"))
+        if preferred:
+            recommended = parsed.recommended_language.language  # type: ignore[attr-defined]
+            a, b = preferred.lower(), recommended.lower()
+            if a not in b and b not in a:
+                raise ValueError(
+                    f"recommended_language: the user explicitly stated '{preferred}', "
+                    f"which must be honored (you chose '{recommended}'). Set the "
+                    "language to the stated preference, set overridden_by_user "
+                    "appropriately, and flag any tradeoffs in the rationale."
                 )
 
 
@@ -63,8 +86,13 @@ def run_stage(
     client: OllamaClient,
     model: str,
     ctx: RequestContext | None = None,
+    context: dict[str, Any] | None = None,
 ) -> BaseModel:
-    """Run one pipeline stage and return its validated output model."""
+    """Run one pipeline stage and return its validated output model.
+
+    ``context`` carries cross-stage facts for semantic checks (e.g. the
+    Stage 1 constraints when validating Stage 2's language recommendation).
+    """
     schema = load_stage_schema(stage)
     system = prompts.system_prompt(stage)
     model_cls = STAGE_MODELS[stage]
@@ -95,7 +123,7 @@ def run_stage(
         )
         try:
             parsed = model_cls.model_validate(json.loads(text))
-            semantic_check(stage, parsed)
+            semantic_check(stage, parsed, context)
             return parsed
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = str(exc)
@@ -226,12 +254,15 @@ def handle_stage2(params: dict[str, Any], ctx: RequestContext) -> dict[str, Any]
         client=client,
         model=model,
         ctx=ctx,
+        context=constraints if isinstance(constraints, dict) else None,
     )
     return {"model": model, "result": result.model_dump()}
 
 
 def handle_stage3(params: dict[str, Any], ctx: RequestContext) -> dict[str, Any]:
-    """Run Stage 3 on the validated Stage 2 spec."""
+    """Run Stage 3, then the Mermaid validate-and-repair loop (Phase 5)."""
+    from speakspec.mermaid_repair import validate_and_repair_bundle
+
     spec = params.get("architecture_spec")
     if not spec:
         raise SidecarError("missing-spec", "Stage 3 needs the Stage 2 architecture spec.")
@@ -244,4 +275,13 @@ def handle_stage3(params: dict[str, Any], ctx: RequestContext) -> dict[str, Any]
         model=model,
         ctx=ctx,
     )
-    return {"model": model, "result": result.model_dump()}
+    ctx.emit_progress({"stage": 3, "state": "validating-diagrams"})
+    finals, reports = validate_and_repair_bundle(
+        result.diagrams.model_dump(),
+        client=client,
+        model=model,
+        on_progress=lambda d: ctx.emit_progress({"stage": 3, **d}),
+    )
+    bundle = result.model_dump()
+    bundle["diagrams"] = finals
+    return {"model": model, "result": bundle, "diagram_reports": reports}

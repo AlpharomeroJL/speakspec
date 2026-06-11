@@ -143,6 +143,21 @@ Non-negotiable request rules:
   `ollama-unavailable` with install guidance (https://ollama.com/download) —
   the build and the app never hard-fail on a missing Ollama.
 
+### Mermaid validation helper (Contract C adjunct)
+
+The validate-and-repair loop needs the *real* Mermaid 11 parser, which exists
+only in JavaScript. Decision: a small Node service at
+[`tools/mermaid-validate/validate.mjs`](../tools/mermaid-validate/validate.mjs)
+(mermaid 11 + jsdom), spawned by the sidecar as a persistent child speaking
+the same NDJSON request/response pattern as Contract B
+(`{id, source}` → `{id, ok, error?}`). Loop order per diagram: real parse →
+up to 3 model repairs with the exact parser error → deterministic sanitizer
+(header normalization, pseudo-dialect converters, label quoting, punctuation)
+→ valid stub flagged for manual review. On end-user machines without Node the
+sanitizer still runs, diagrams are marked `unvalidated`, and the webview's
+mermaid renderer (same parser family) is the last-line check at display time.
+The 20-spec release gate always runs with the real validator.
+
 ## Contract D — Python ↔ faster-whisper (in-process)
 
 ASR runs inside the sidecar process via the faster-whisper library.

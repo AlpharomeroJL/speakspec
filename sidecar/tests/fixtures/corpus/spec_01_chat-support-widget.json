@@ -1,0 +1,96 @@
+{
+  "system_overview": "chat-support-widget is a embeddable customer support chat widget with canned replies. It is built as a small focused system with Widget (embed.js) at its core, supported by Reply Router and Agent Console.",
+  "recommended_language": {
+    "language": "TypeScript",
+    "confidence": "medium",
+    "rationale": "TypeScript fits the embeddable customer support chat widget with canned replies workload on technical grounds.",
+    "overridden_by_user": false
+  },
+  "quality_goals": [
+    {
+      "goal": "Correct output under normal failure modes",
+      "driver": "core feature correctness"
+    },
+    {
+      "goal": "Maintainable by one person",
+      "driver": "solo team size"
+    }
+  ],
+  "architecture_decisions": [
+    {
+      "title": "Use Widget (embed.js) as the system core",
+      "chosen_option": "Widget (embed.js)",
+      "confidence": "high",
+      "rationale": "The embeddable customer support chat widget with canned replies hinges on this component working well.",
+      "consequences": {
+        "positive": [
+          "Single place to harden the critical path"
+        ],
+        "negative": [
+          "Core component becomes a bottleneck for change"
+        ]
+      },
+      "ruled_out": [
+        {
+          "option": "Spreading the logic across services",
+          "rejection_reason": "Operational overhead for a small system."
+        }
+      ]
+    },
+    {
+      "title": "Run Agent Console asynchronously",
+      "chosen_option": "Background processing for Agent Console",
+      "confidence": "medium",
+      "rationale": "Keeps the interactive path fast on modest hardware.",
+      "consequences": {
+        "positive": [
+          "Responsive UI under load"
+        ],
+        "negative": [
+          "Eventually-consistent side effects need messaging"
+        ]
+      },
+      "ruled_out": [
+        {
+          "option": "Synchronous in-request processing",
+          "rejection_reason": "Ties user latency to slow external work."
+        }
+      ]
+    }
+  ],
+  "oss_components": [
+    {
+      "name": "SQLite",
+      "version": "3.45",
+      "purpose": "primary store",
+      "why_selected": "single-node scale, zero ops",
+      "do_not_build": true
+    }
+  ],
+  "what_not_to_build": [
+    "A custom database or queue",
+    "A plugin system before there are users"
+  ],
+  "risk_flags": [
+    {
+      "risk": "External dependency outage stalls the async path",
+      "severity": "medium",
+      "mitigation": "Retry with backoff and a dead-letter table."
+    }
+  ],
+  "open_questions": [
+    "What is the realistic peak concurrent usage?"
+  ],
+  "complexity": {
+    "rating": "M",
+    "time_estimate": "1-2 weeks to first working slice",
+    "key_drivers": [
+      "Hardening Widget (embed.js)",
+      "Async orchestration"
+    ]
+  },
+  "constraints": [
+    "Entities Conversation, Message, Agent must persist relationally",
+    "Components: Widget (embed.js), Reply Router, Agent Console"
+  ]
+}

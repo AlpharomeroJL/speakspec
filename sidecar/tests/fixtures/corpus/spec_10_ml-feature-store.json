@@ -1,0 +1,96 @@
+{
+  "system_overview": "ml-feature-store is a batch feature store with point-in-time joins for churn models. It is built as a small focused system with Feature Registry at its core, supported by Backfill Runner (Spark) and Serving Cache.",
+  "recommended_language": {
+    "language": "Python",
+    "confidence": "medium",
+    "rationale": "Python fits the batch feature store with point-in-time joins for churn models workload on technical grounds.",
+    "overridden_by_user": false
+  },
+  "quality_goals": [
+    {
+      "goal": "Correct output under normal failure modes",
+      "driver": "core feature correctness"
+    },
+    {
+      "goal": "Maintainable by one person",
+      "driver": "solo team size"
+    }
+  ],
+  "architecture_decisions": [
+    {
+      "title": "Use Feature Registry as the system core",
+      "chosen_option": "Feature Registry",
+      "confidence": "high",
+      "rationale": "The batch feature store with point-in-time joins for churn models hinges on this component working well.",
+      "consequences": {
+        "positive": [
+          "Single place to harden the critical path"
+        ],
+        "negative": [
+          "Core component becomes a bottleneck for change"
+        ]
+      },
+      "ruled_out": [
+        {
+          "option": "Spreading the logic across services",
+          "rejection_reason": "Operational overhead for a small system."
+        }
+      ]
+    },
+    {
+      "title": "Run Serving Cache asynchronously",
+      "chosen_option": "Background processing for Serving Cache",
+      "confidence": "medium",
+      "rationale": "Keeps the interactive path fast on modest hardware.",
+      "consequences": {
+        "positive": [
+          "Responsive UI under load"
+        ],
+        "negative": [
+          "Eventually-consistent side effects need messaging"
+        ]
+      },
+      "ruled_out": [
+        {
+          "option": "Synchronous in-request processing",
+          "rejection_reason": "Ties user latency to slow external work."
+        }
+      ]
+    }
+  ],
+  "oss_components": [
+    {
+      "name": "SQLite",
+      "version": "3.45",
+      "purpose": "primary store",
+      "why_selected": "single-node scale, zero ops",
+      "do_not_build": true
+    }
+  ],
+  "what_not_to_build": [
+    "A custom database or queue",
+    "A plugin system before there are users"
+  ],
+  "risk_flags": [
+    {
+      "risk": "External dependency outage stalls the async path",
+      "severity": "medium",
+      "mitigation": "Retry with backoff and a dead-letter table."
+    }
+  ],
+  "open_questions": [
+    "What is the realistic peak concurrent usage?"
+  ],
+  "complexity": {
+    "rating": "M",
+    "time_estimate": "1-2 weeks to first working slice",
+    "key_drivers": [
+      "Hardening Feature Registry",
+      "Async orchestration"
+    ]
+  },
+  "constraints": [
+    "Entities Feature, FeatureSet, TrainingRun must persist relationally",
+    "Components: Feature Registry, Backfill Runner (Spark), Serving Cache"
+  ]
+}
