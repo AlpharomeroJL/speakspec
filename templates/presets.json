@@ -1,0 +1,24 @@
+{
+  "presets": [
+    {
+      "name": "Solo MVP",
+      "optimize_for": "Fastest path to a working product for one builder: boring proven tech, one deployable unit, near-zero operations, easy to abandon or grow."
+    },
+    {
+      "name": "API service",
+      "optimize_for": "A long-lived network service: clean API boundaries, observability from day one, horizontal deployability, schema-versioned persistence."
+    },
+    {
+      "name": "CLI tool",
+      "optimize_for": "A single trivially-installable binary or package: instant startup, no server components, great help text, scriptable output."
+    },
+    {
+      "name": "Browser extension",
+      "optimize_for": "Manifest V3 reality: minimal permissions, store-review friendliness, no remote code, graceful degradation when offline."
+    },
+    {
+      "name": "Data pipeline",
+      "optimize_for": "Idempotent re-runnable stages, explicit schema evolution, observable progress, cheap backfills, failure isolation between stages."
+    }
+  ]
+}

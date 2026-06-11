@@ -64,6 +64,36 @@ export function frontendLog(message: string): Promise<void> {
   return invoke("frontend_log", { message });
 }
 
+/** Result wrapper returned by every pipeline stage handler. */
+export interface StageResponse<T> {
+  model: string;
+  result: T;
+}
+
+/**
+ * Run one pipeline stage. Stage params:
+ * 1: `{ transcript, interview_answers?, model? }`
+ * 2: `{ constraints, interview_answers?, template?, model? }`
+ * 3: `{ architecture_spec, model? }`
+ */
+export function runPipelineStage<T>(
+  stage: 1 | 2 | 3,
+  params: Record<string, unknown>,
+): Promise<StageResponse<T>> {
+  return invoke<StageResponse<T>>("run_pipeline_stage", { stage, params });
+}
+
+/** Installed Ollama models plus the auto-selected default. */
+export interface ModelsList {
+  models: Array<{ name: string; size: number }>;
+  selected: string | null;
+}
+
+/** List installed Ollama models (empty list if Ollama is unreachable). */
+export function listModels(): Promise<ModelsList> {
+  return invoke<ModelsList>("list_models");
+}
+
 /** Subscribe to a typed Tauri event channel. Returns the unlisten handle. */
 export function onEvent<T>(event: EventName, handler: (payload: T) => void): Promise<UnlistenFn> {
   return listen<T>(event, (e) => handler(e.payload));

@@ -1,0 +1,49 @@
+{
+  "comment": "Curated, community-editable knowledge base of well-maintained OSS libraries by domain. Injected into Stage 2 so the model recommends mature libraries instead of custom builds. Versions are minimums known-good at last edit.",
+  "version": 1,
+  "domains": {
+    "web_api": [
+      { "name": "FastAPI", "language": "Python", "version": "0.115", "use_for": "HTTP APIs with validation and OpenAPI for free" },
+      { "name": "axum", "language": "Rust", "version": "0.8", "use_for": "HTTP APIs on tokio with tower middleware" },
+      { "name": "Hono", "language": "TypeScript", "version": "4", "use_for": "HTTP APIs on Node/Bun/edge runtimes" },
+      { "name": "Echo", "language": "Go", "version": "4", "use_for": "HTTP APIs with minimal ceremony" }
+    ],
+    "persistence": [
+      { "name": "SQLite", "language": "any", "version": "3.45", "use_for": "single-node relational storage; the default until proven otherwise" },
+      { "name": "PostgreSQL", "language": "any", "version": "16", "use_for": "relational storage with concurrent writers or growth headroom" },
+      { "name": "sqlx", "language": "Rust", "version": "0.8", "use_for": "compile-time checked SQL without an ORM" },
+      { "name": "SQLAlchemy", "language": "Python", "version": "2.0", "use_for": "SQL toolkit when queries outgrow raw strings" },
+      { "name": "Drizzle", "language": "TypeScript", "version": "0.36", "use_for": "typed SQL schema and queries" }
+    ],
+    "auth": [
+      { "name": "Authlib", "language": "Python", "version": "1.3", "use_for": "OAuth/OIDC flows instead of hand-rolled token code" },
+      { "name": "Lucia-style session pattern + argon2", "language": "any", "version": "latest-stable", "use_for": "simple session auth; never hand-roll password hashing (use argon2/bcrypt libs)" }
+    ],
+    "background_jobs": [
+      { "name": "APScheduler", "language": "Python", "version": "3.10", "use_for": "in-process scheduled jobs without a queue server" },
+      { "name": "tokio-cron-scheduler", "language": "Rust", "version": "0.13", "use_for": "in-process scheduled jobs on tokio" }
+    ],
+    "files_media": [
+      { "name": "Pillow", "language": "Python", "version": "11", "use_for": "image resize/thumbnail instead of shelling to ImageMagick" },
+      { "name": "image", "language": "Rust", "version": "0.25", "use_for": "image decode/resize" }
+    ],
+    "frontend": [
+      { "name": "htmx", "language": "any (server-rendered)", "version": "2", "use_for": "interactivity without an SPA build chain" },
+      { "name": "SvelteKit", "language": "TypeScript", "version": "2", "use_for": "full app framework when an SPA is genuinely warranted" },
+      { "name": "Chart.js", "language": "TypeScript", "version": "4", "use_for": "dashboard charts instead of hand-drawn canvas" }
+    ],
+    "cli": [
+      { "name": "clap", "language": "Rust", "version": "4", "use_for": "argument parsing with derive macros" },
+      { "name": "Typer", "language": "Python", "version": "0.15", "use_for": "CLI apps with type-hint-driven parsing" }
+    ],
+    "integrations": [
+      { "name": "gspread", "language": "Python", "version": "6", "use_for": "Google Sheets read/write with a service account" },
+      { "name": "httpx", "language": "Python", "version": "0.28", "use_for": "HTTP client with timeouts and async support" },
+      { "name": "reqwest", "language": "Rust", "version": "0.12", "use_for": "HTTP client" }
+    ],
+    "observability": [
+      { "name": "structlog", "language": "Python", "version": "24", "use_for": "structured logging" },
+      { "name": "tracing", "language": "Rust", "version": "0.1", "use_for": "structured logging and spans" }
+    ]
+  }
+}

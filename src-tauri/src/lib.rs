@@ -32,6 +32,8 @@ pub fn run() -> anyhow::Result<()> {
             commands::ping_sidecar,
             commands::cancel_sidecar_request,
             commands::frontend_log,
+            commands::run_pipeline_stage,
+            commands::list_models,
         ])
         .build(tauri::generate_context!())
         .context("failed to build the Tauri application")?;

@@ -1,0 +1,17 @@
+{
+  "comment": "Model preference tiers. Patterns are name prefixes matched against installed Ollama tags at runtime; nothing is pulled automatically. Gemma 3 is superseded and must not be a default.",
+  "tiers": {
+    "power_user": {
+      "min_vram_gb": 16,
+      "patterns": ["gemma4:27b", "qwen3:14b"]
+    },
+    "default": {
+      "min_vram_gb": 8,
+      "patterns": ["gemma4:12b", "qwen3:8b"]
+    },
+    "fast_fallback": {
+      "min_vram_gb": 4,
+      "patterns": ["phi4-mini", "gemma4:4b", "qwen3:4b"]
+    }
+  }
+}
