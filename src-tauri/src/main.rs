@@ -2,5 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    speakspec_lib::run()
+    if let Err(err) = speakspec_lib::run() {
+        eprintln!("Speakspec failed to start: {err:#}");
+        std::process::exit(1);
+    }
 }

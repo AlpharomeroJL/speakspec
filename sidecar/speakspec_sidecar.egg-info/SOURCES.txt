@@ -1,0 +1,12 @@
+pyproject.toml
+speakspec/__init__.py
+speakspec/__main__.py
+speakspec/messages.py
+speakspec/rpc.py
+speakspec/handlers/__init__.py
+speakspec/handlers/ping.py
+speakspec_sidecar.egg-info/PKG-INFO
+speakspec_sidecar.egg-info/SOURCES.txt
+speakspec_sidecar.egg-info/dependency_links.txt
+speakspec_sidecar.egg-info/requires.txt
+speakspec_sidecar.egg-info/top_level.txt

@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: speakspec-sidecar
+Version: 0.1.0
+Summary: Speakspec AI inference sidecar: ASR (faster-whisper) + three-stage Ollama pipeline.
+License: MIT
+Requires-Python: >=3.11
+Requires-Dist: faster-whisper>=1.2
+Requires-Dist: pydantic>=2.13
+Requires-Dist: httpx>=0.28
+Provides-Extra: dev
+Requires-Dist: ruff>=0.15; extra == "dev"
+Requires-Dist: pytest>=9.0; extra == "dev"
