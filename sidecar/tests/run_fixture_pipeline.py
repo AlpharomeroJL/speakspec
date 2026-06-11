@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 from speakspec.pipeline import (
+    ensure_real_agents_md,
     make_client,
     resolve_model,
     run_stage,
@@ -60,12 +61,9 @@ def main() -> int:
     print(json.dumps(stage2.model_dump(), indent=2))
 
     t0 = time.time()
-    stage3 = run_stage(
-        3,
-        stage3_message(json.dumps(stage2.model_dump(), indent=1)),
-        client=client,
-        model=model,
-    )
+    spec_json = json.dumps(stage2.model_dump(), indent=1)
+    stage3 = run_stage(3, stage3_message(spec_json), client=client, model=model)
+    stage3 = ensure_real_agents_md(stage3, spec_json, client=client, model=model)
     print(f"== stage 3 done in {time.time() - t0:.0f}s", file=sys.stderr)
     print("\n===== STAGE 3 OUTPUT (validated) =====")
     print(json.dumps(stage3.model_dump(), indent=2))

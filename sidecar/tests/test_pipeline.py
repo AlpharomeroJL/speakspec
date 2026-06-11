@@ -96,6 +96,35 @@ def test_run_stage_recovers_from_semantic_failure() -> None:
     assert "language_preference" in client.calls[1]["user"]
 
 
+def test_agents_md_micro_regeneration() -> None:
+    from speakspec.pipeline import agents_md_is_real, ensure_real_agents_md
+    from speakspec.schemas import OutputBundle
+
+    stage3 = json.loads(
+        (FIXTURES / "examples" / "stage3_example.json").read_text(encoding="utf-8")
+    )
+    real_doc = stage3["agents_md"]
+    assert agents_md_is_real(real_doc)
+    for bad_doc in ("@AGENTS.md", "# Title only", "no markdown at all"):
+        assert not agents_md_is_real(bad_doc)
+
+    # The shim in agents_md triggers exactly one focused regeneration call.
+    broken = dict(stage3)
+    broken["agents_md"] = "@AGENTS.md"
+    bundle = OutputBundle.model_validate(broken)
+    client = FakeClient([json.dumps({"agents_md": real_doc})])
+    fixed = ensure_real_agents_md(bundle, "{}", client=client, model="fake")
+    assert fixed.agents_md == real_doc
+    assert len(client.calls) == 1
+    assert client.calls[0]["num_predict"] == 4096
+
+    # A real document passes through with zero model calls.
+    client2 = FakeClient([])
+    untouched = ensure_real_agents_md(fixed, "{}", client=client2, model="fake")
+    assert untouched.agents_md == real_doc
+    assert client2.calls == []
+
+
 def test_stage2_semantic_check_enforces_stated_language() -> None:
     from speakspec.pipeline import semantic_check, stated_language
     from speakspec.schemas import ArchitectureSpec

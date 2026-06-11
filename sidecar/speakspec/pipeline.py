@@ -19,14 +19,16 @@ from speakspec.messages import SidecarError
 from speakspec.model_select import choose_model
 from speakspec.ollama_client import OllamaClient
 from speakspec.rpc import RequestContext
-from speakspec.schemas import STAGE_MODELS, ConstraintExtraction, load_stage_schema
+from speakspec.schemas import STAGE_MODELS, ConstraintExtraction, OutputBundle, load_stage_schema
 
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
-# Output budget added to the input estimate when sizing num_ctx. Stage 3
-# emits every artifact in one object and needs the most room.
-_OUTPUT_BUDGET = {1: 4096, 2: 6144, 3: 8192}
+# Output budget added to the input estimate when sizing num_ctx, and used as
+# the explicit num_predict generation cap. Stage 1 gets generous room because
+# fact-dense transcripts legitimately produce long constraint sets; Stage 3
+# emits every artifact in one object and needs the most.
+_OUTPUT_BUDGET = {1: 6144, 2: 6144, 3: 8192}
 # Rough chars-per-token for mixed English/JSON; deliberately conservative.
 _CHARS_PER_TOKEN = 3.0
 
@@ -118,6 +120,7 @@ def run_stage(
             schema=schema,
             temperature=temperature,
             num_ctx=num_ctx,
+            num_predict=_OUTPUT_BUDGET[stage],
             on_token=on_token,
             cancelled=cancelled,
         )
@@ -130,10 +133,19 @@ def run_stage(
             logger.warning("stage %d attempt %d failed validation: %s", stage, attempt + 1, exc)
             if ctx is not None:
                 ctx.emit_progress({"stage": stage, "state": "retrying", "attempt": attempt + 1})
+            # Truncated JSON means the generation hit the length cap: the
+            # retry must also demand brevity or it will truncate again.
+            length_note = (
+                "\nYour output was cut off because it exceeded the length limit. "
+                "Be concise: at most 2 entries per constraint category, short "
+                "strings, no repetition."
+                if isinstance(exc, json.JSONDecodeError)
+                else ""
+            )
             message = (
                 f"{user_message}\n\n"
                 f"YOUR PREVIOUS OUTPUT FAILED VALIDATION WITH THIS ERROR:\n{last_error}\n"
-                "Fix only the invalid fields and re-emit the complete JSON object."
+                f"Fix only the invalid fields and re-emit the complete JSON object.{length_note}"
             )
 
     raise SidecarError(
@@ -203,6 +215,100 @@ def stage3_message(architecture_spec_json: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# AGENTS.md micro-regeneration
+# ---------------------------------------------------------------------------
+
+# Small models reliably write '@AGENTS.md' (the shim) or a stub into the
+# agents_md field of the big Stage 3 bundle, and whole-stage retries cannot
+# coax them out of it. A focused single-artifact call fixes what the bundle
+# call cannot — same architecture as the Mermaid repair loop.
+
+AGENTS_MD_FORMAT = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["agents_md"],
+    "properties": {"agents_md": {"type": "string"}},
+}
+
+AGENTS_MD_SYSTEM_PROMPT = (
+    "You write AGENTS.md files: the agent context file AI coding tools read "
+    "first. Produce only the markdown document. Non-negotiable rules: under "
+    "200 lines; lean and command-first; fixed section order: (1) one-line "
+    "project description, (2) tech stack with exact versions, (3) exact "
+    "commands - build, test, lint, run, deploy - each in backticks, "
+    "(4) 3-5 key directories, one line each, pointing at files, (5) hard "
+    "constraints that must always be true, (6) a do-not block of what must "
+    "never happen, (7) first tasks in build order, (8) open questions. Do not "
+    "describe files that appear in the provided file tree; do not restate "
+    "anything a linter or compiler enforces; do not pad."
+)
+
+
+def agents_md_is_real(doc: str) -> bool:
+    """Structural floor: a real document, not the shim or a stub.
+
+    Deliberately minimal — multi-line with at least one backticked command.
+    Section structure and command completeness are the full quality gate's
+    job (``agents_md.py``); this only catches shim/stub substitution.
+    """
+    text = doc.strip()
+    return text != "@AGENTS.md" and text.count("\n") >= 9 and "`" in text
+
+
+def ensure_real_agents_md(
+    bundle: OutputBundle,
+    spec_json: str,
+    *,
+    client: OllamaClient,
+    model: str,
+    ctx: RequestContext | None = None,
+) -> OutputBundle:
+    """Replace a fake ``agents_md`` via a focused regeneration call.
+
+    Two attempts; raises ``SidecarError`` if the model still cannot produce
+    a structurally real document.
+    """
+    if agents_md_is_real(bundle.agents_md):
+        return bundle
+    user = (
+        f"ARCHITECTURE SPEC:\n{spec_json}\n\n"
+        f"FILE TREE (do not re-describe these files):\n{bundle.file_tree}\n\n"
+        "Write the complete AGENTS.md now."
+    )
+    system = AGENTS_MD_SYSTEM_PROMPT
+    for attempt in range(2):
+        if ctx is not None:
+            ctx.emit_progress(
+                {"stage": 3, "state": "regenerating-agents-md", "attempt": attempt + 1}
+            )
+        text = client.chat_structured(
+            model=model,
+            system=system,
+            user=user,
+            schema=AGENTS_MD_FORMAT,
+            temperature=0.2,
+            num_ctx=size_num_ctx(3, system, user),
+            num_predict=4096,
+        )
+        try:
+            doc = str(json.loads(text)["agents_md"])
+        except (json.JSONDecodeError, KeyError, TypeError):
+            doc = text
+        if agents_md_is_real(doc):
+            return bundle.model_copy(update={"agents_md": doc})
+        user += (
+            "\n\nYOUR PREVIOUS ATTEMPT WAS NOT A REAL DOCUMENT. Write the full "
+            "multi-section markdown file with backticked commands."
+        )
+    raise SidecarError(
+        "agents-md-generation-failed",
+        "The model could not produce a structurally complete AGENTS.md after "
+        "focused retries. Try a larger model tier.",
+        {"stage": 3},
+    )
+
+
+# ---------------------------------------------------------------------------
 # RPC handlers (registered in handlers/__init__.py)
 # ---------------------------------------------------------------------------
 
@@ -268,13 +374,15 @@ def handle_stage3(params: dict[str, Any], ctx: RequestContext) -> dict[str, Any]
         raise SidecarError("missing-spec", "Stage 3 needs the Stage 2 architecture spec.")
     client = make_client()
     model = resolve_model(params.get("model"), client)
+    spec_json = json.dumps(spec, indent=1)
     result = run_stage(
         3,
-        stage3_message(json.dumps(spec, indent=1)),
+        stage3_message(spec_json),
         client=client,
         model=model,
         ctx=ctx,
     )
+    result = ensure_real_agents_md(result, spec_json, client=client, model=model, ctx=ctx)
     ctx.emit_progress({"stage": 3, "state": "validating-diagrams"})
     finals, reports = validate_and_repair_bundle(
         result.diagrams.model_dump(),

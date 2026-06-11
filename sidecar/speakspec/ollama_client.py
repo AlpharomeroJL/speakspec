@@ -61,14 +61,22 @@ class OllamaClient:
         schema: dict,
         temperature: float,
         num_ctx: int,
+        num_predict: int | None = None,
         on_token: Callable[[str], None] | None = None,
         cancelled: Callable[[], bool] | None = None,
     ) -> str:
         """Stream a schema-constrained chat completion; return the full text.
 
+        ``num_predict`` bounds the generation so a degenerating model fails
+        fast (and validation retries can perturb it) instead of overflowing
+        ``num_ctx`` and truncating mid-string.
+
         Raises ``SidecarError`` with a stable code for every failure mode:
         ``ollama-unavailable``, ``ollama-request-failed``, ``cancelled``.
         """
+        options: dict = {"temperature": temperature, "num_ctx": num_ctx}
+        if num_predict is not None:
+            options["num_predict"] = num_predict
         payload: dict = {
             "model": model,
             "messages": [
@@ -77,7 +85,7 @@ class OllamaClient:
             ],
             "format": schema,
             "stream": True,
-            "options": {"temperature": temperature, "num_ctx": num_ctx},
+            "options": options,
         }
         if _is_thinking_model(model):
             payload["think"] = False
@@ -89,6 +97,50 @@ class OllamaClient:
                 payload.pop("think")
                 return self._stream_chat(payload, on_token, cancelled)
             raise
+
+    def pull_model(
+        self,
+        name: str,
+        on_progress: Callable[[dict], None] | None = None,
+        cancelled: Callable[[], bool] | None = None,
+    ) -> None:
+        """Pull a model via ``/api/pull``, streaming progress.
+
+        Progress dicts carry ``status`` and, when downloading, ``total`` and
+        ``completed`` bytes (the UI derives percent/ETA). Ollama resumes
+        partial layer downloads natively, so interruption is safe.
+        """
+        try:
+            with httpx.stream(
+                "POST",
+                f"{self.base_url}/api/pull",
+                json={"name": name, "stream": True},
+                timeout=httpx.Timeout(connect=5.0, read=None, write=30.0, pool=5.0),
+            ) as resp:
+                if resp.status_code != 200:
+                    body = resp.read().decode("utf-8", errors="replace")
+                    raise SidecarError(
+                        "model-pull-failed",
+                        f"Ollama could not pull '{name}' (HTTP {resp.status_code}).",
+                        {"body": body[:1000]},
+                    )
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    if cancelled is not None and cancelled():
+                        raise SidecarError("cancelled", "The model download was cancelled.")
+                    obj = json.loads(line)
+                    if obj.get("error"):
+                        raise SidecarError(
+                            "model-pull-failed",
+                            f"Ollama reported an error pulling '{name}': {obj['error']}",
+                        )
+                    if on_progress is not None:
+                        on_progress(obj)
+        except httpx.HTTPError as exc:
+            raise SidecarError(
+                "ollama-unavailable", OLLAMA_INSTALL_HINT, {"reason": str(exc)}
+            ) from exc
 
     def _stream_chat(
         self,
