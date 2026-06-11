@@ -1,7 +1,0 @@
-faster-whisper>=1.2
-pydantic>=2.13
-httpx>=0.28
-
-[dev]
-ruff>=0.15
-pytest>=9.0
