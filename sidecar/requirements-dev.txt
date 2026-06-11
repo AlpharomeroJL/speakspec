@@ -1,0 +1,4 @@
+# Development-only dependencies for the Speakspec sidecar.
+-r requirements.txt
+ruff>=0.15
+pytest>=9.0

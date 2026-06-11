@@ -1,0 +1,12 @@
+node_modules
+dist
+
+# Python sidecar
+sidecar/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Local app data created during dev runs
+.speakspec-dev/
