@@ -14,11 +14,6 @@
 3. Hit Record, describe what you want to build, review, generate
 ```
 
-<p align="center">
-  <img src="docs/assets/demo.gif" alt="Demo: speak → constraint review → streaming pipeline → AGENTS.md + diagrams → paste into Claude Code → scaffolding" width="720" />
-  <br/><em>(demo GIF placeholder — full loop: speak → review constraints → streaming pipeline → AGENTS.md + diagrams → paste into Claude Code → scaffolding)</em>
-</p>
-
 ## What you get
 
 Every session produces a complete, paste-ready bundle:
