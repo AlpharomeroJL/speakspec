@@ -27,7 +27,26 @@ if (-not $sysPython) {
 & python -m venv $VenvDir
 & $Python -m pip install --upgrade pip wheel
 & $Python -m pip install -r (Join-Path $SidecarSrc "requirements.txt")
-Write-Host "==> Skipping NVIDIA wheels (installer size); GPU ASR uses CPU fallback unless wheels present"
+Write-Host "==> Installing NVIDIA CUDA wheels for bundled GPU ASR"
+& $Python -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
+
+# cuDNN ships large optional engine DLLs we do not need for faster-whisper.
+# Dropping them keeps the NSIS installer under the 2 GB compile limit.
+$CudnnBin = Join-Path $VenvDir "Lib\site-packages\nvidia\cudnn\bin"
+foreach ($dll in @(
+        "cudnn_engines_precompiled64_9.dll",
+        "cudnn_heuristic64_9.dll",
+        "cudnn_graph64_9.dll",
+        "cudnn_engines_tensor_ir64_9.dll"
+    )) {
+    $path = Join-Path $CudnnBin $dll
+    if (Test-Path $path) {
+        Remove-Item -Force $path
+        Write-Host "    pruned $dll"
+    }
+}
+Get-ChildItem (Join-Path $VenvDir "Lib\site-packages") -Directory -Filter "nvidia*.dist-info" |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
 # Install sidecar package (source copied below)
 $SidecarDest = Join-Path $OutRoot "sidecar"
@@ -47,7 +66,6 @@ Copy-Item -Force (Join-Path $RepoRoot "docs\schemas\*") $schemasDest
 # --- Mermaid validator (Node) ---
 $MermaidDir = Join-Path $OutRoot "tools\mermaid-validate"
 Copy-Item -Recurse -Force (Join-Path $RepoRoot "tools\mermaid-validate") $MermaidDir
-$env:CI = 'true'
 $env:CI = 'true'
 Push-Location $MermaidDir
 if (Test-Path node_modules) { cmd /c 'rd /s /q node_modules' }
@@ -72,6 +90,8 @@ Copy-Item -Force (Join-Path $NodeExtract "node.exe") (Join-Path $NodeDir "node.e
 # Size report
 $sizeMb = [math]::Round((Get-ChildItem -Recurse $OutRoot | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
 Write-Host "==> Runtime packaged: ${sizeMb} MB at $OutRoot"
-if ($sizeMb -gt 130) {
-    Write-Warning "Runtime exceeds 130 MB - verify installer stays under 120 MB after NSIS compression"
+if ($sizeMb -gt 1900) {
+    Write-Warning "Runtime exceeds 1.9 GB - NSIS may hit its 2 GB compile limit"
+} elseif ($sizeMb -gt 500) {
+    Write-Host "==> Runtime includes CUDA wheels; expect a larger installer (~1 GB+ compressed)"
 }

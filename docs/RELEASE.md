@@ -6,7 +6,7 @@ Run this after `pnpm tauri build` produces an installer artifact.
 
 - [ ] `pnpm tauri build` completes; NSIS installer under `src-tauri/target/release/bundle/`
 - [ ] Installer SHA-256 recorded in release notes
-- [ ] Installer size under 120 MB (or documented exception)
+- [ ] Installer size documented (CPU-only was ~115 MB; CUDA wheels raise it to ~780 MB)
 
 ## Automated gates
 

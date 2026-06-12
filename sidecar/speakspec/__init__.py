@@ -7,4 +7,4 @@ network I/O to any host other than the local Ollama server unless the user has
 explicitly enabled a cloud key in settings.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"

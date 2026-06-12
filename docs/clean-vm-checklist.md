@@ -10,7 +10,7 @@ Run the full list on a fresh VM for each target OS before tagging a release.
 
 ## Install + first run
 
-- [ ] Installer (<120 MB) installs without admin surprises; SHA-256 matches the published checksum
+- [ ] Installer (~1 GB with bundled CUDA wheels) installs without admin surprises; SHA-256 matches the published checksum
 - [ ] App starts in under 3 seconds
 - [ ] First-run hardware detection completes in under 5 seconds and reports
       the correct device (GPU name / CPU) — manual override works in settings
