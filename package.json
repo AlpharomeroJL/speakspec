@@ -1,6 +1,6 @@
 {
   "name": "speakspec",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "",
   "type": "module",
   "scripts": {
@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
+    "package:runtime": "powershell -ExecutionPolicy Bypass -File scripts/package-runtime.ps1",
     "tauri": "tauri"
   },
   "license": "MIT",

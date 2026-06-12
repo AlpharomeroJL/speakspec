@@ -4,11 +4,25 @@
  * loop) with one-click copy of the raw source (DOD 2.9).
  */
 import { createEffect, createSignal, For, Show } from "solid-js";
-import mermaid from "mermaid";
 import { exportBundle, showInFolder } from "../lib/ipc";
 import { errorText, resetSession, setError, state } from "../state";
 
-mermaid.initialize({ startOnLoad: false, securityLevel: "loose", theme: "neutral" });
+type MermaidApi = typeof import("mermaid")["default"];
+let mermaidPromise: Promise<MermaidApi> | null = null;
+
+function loadMermaid(): Promise<MermaidApi> {
+  if (!mermaidPromise) {
+    mermaidPromise = import("mermaid").then((mod) => {
+      mod.default.initialize({
+        startOnLoad: false,
+        securityLevel: "loose",
+        theme: "neutral",
+      });
+      return mod.default;
+    });
+  }
+  return mermaidPromise;
+}
 
 const TABS = ["AGENTS.md", "CLAUDE.md", "ADRs", "Diagrams", "File tree", "First PR", "JSON"];
 const DIAGRAM_KINDS = ["sequence", "er", "component", "c4_context", "c4_container"] as const;
@@ -38,8 +52,8 @@ export default function Results() {
     createEffect(() => {
       const source = props.source;
       if (!host || !source) return;
-      mermaid
-        .render(`d-${props.kind}-${Date.now()}`, source)
+      void loadMermaid()
+        .then((mermaid) => mermaid.render(`d-${props.kind}-${Date.now()}`, source))
         .then(({ svg }) => {
           if (host) host.innerHTML = svg;
         })

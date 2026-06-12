@@ -255,3 +255,24 @@ export function onEvent<T>(event: EventName, handler: (payload: T) => void): Pro
 export function invokeRaw<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   return invoke<T>(command, args);
 }
+
+/** Persisted user settings (see `src-tauri/src/config.rs`). */
+export interface AppSettings {
+  default_model: string | null;
+  asr_device: string;
+  vram_override_gb: number | null;
+  ollama_url: string;
+  interview_auto_mode: boolean;
+  cloud_stage3_enabled: boolean;
+  cloud_provider: string;
+  cloud_api_key: string | null;
+  fast_pipeline: boolean;
+}
+
+export function getSettings(): Promise<AppSettings> {
+  return invoke<AppSettings>("get_settings");
+}
+
+export function saveSettings(settings: AppSettings): Promise<void> {
+  return invoke("save_settings", { settings });
+}

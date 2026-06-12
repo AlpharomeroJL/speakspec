@@ -7,6 +7,7 @@
 
 pub mod audio;
 mod commands;
+pub mod config;
 mod error;
 pub mod pipeline_types;
 pub mod sessions;
@@ -65,6 +66,8 @@ pub fn run() -> anyhow::Result<()> {
             commands::search_sessions,
             commands::load_session,
             commands::delete_session,
+            commands::get_settings,
+            commands::save_settings,
         ])
         .build(tauri::generate_context!())
         .context("failed to build the Tauri application")?;

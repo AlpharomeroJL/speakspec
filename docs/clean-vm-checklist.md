@@ -36,7 +36,11 @@ Run the full list on a fresh VM for each target OS before tagging a release.
 - [ ] Constraint review shows stated/inferred labels; language info box when
       no language stated; inline edit changes Stage 2 output
 - [ ] Interview answers visibly change the architecture (before/after diff)
-- [ ] Pipeline (10-min recording): under 90s on RTX 4060+, under 8 min CPU-only
+- [ ] Pipeline (~90s recording): under 90s on RTX 4060+ with fast pipeline
+      enabled or fast_fallback model, under 8 min CPU-only
+- [ ] Pipeline (10-min recording): under 8 min on RTX 4060+ (default tier);
+      under 90s only when fast pipeline is enabled and a fast_fallback model
+      is installed
 - [ ] All 5 diagrams render in-app; stubbed diagrams (if any) show the
       manual-review badge
 - [ ] AGENTS.md under 200 lines with build/test/run commands present

@@ -297,6 +297,26 @@ pub async fn load_session(
     }
 }
 
+/// Load persisted user settings.
+#[tauri::command]
+pub fn get_settings(app: AppHandle) -> Result<crate::config::AppSettings, AppError> {
+    crate::config::load_settings(&app)
+        .map_err(|e| AppError::new("settings-load-failed", format!("{e:#}")))
+}
+
+/// Save user settings and restart the sidecar so env/config changes apply.
+#[tauri::command]
+pub async fn save_settings(
+    app: AppHandle,
+    sidecar: State<'_, SidecarManager>,
+    settings: crate::config::AppSettings,
+) -> Result<(), AppError> {
+    crate::config::save_settings(&app, &settings)
+        .map_err(|e| AppError::new("settings-save-failed", format!("{e:#}")))?;
+    sidecar.restart().await;
+    Ok(())
+}
+
 /// Delete a session: database row and every file in its directory.
 #[tauri::command]
 pub async fn delete_session(

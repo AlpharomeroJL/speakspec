@@ -3,7 +3,8 @@
  * voice answers (voice reuses the main capture flow + transcription), and
  * answers are injected into Stage 2.
  */
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, onMount, Show } from "solid-js";
+import { getSettings } from "../lib/ipc";
 import {
   startRecording,
   stopRecording,
@@ -13,7 +14,18 @@ import { errorText, setAnswer, setError, startGeneration, state } from "../state
 
 export default function Interview() {
   const [recordingFor, setRecordingFor] = createSignal<number | null>(null);
+  const [autoMode, setAutoMode] = createSignal(false);
   const questions = () => state.stage1?.interview_questions ?? [];
+
+  onMount(async () => {
+    try {
+      const s = await getSettings();
+      setAutoMode(s.interview_auto_mode);
+      if (s.interview_auto_mode) void startGeneration();
+    } catch {
+      /* settings unavailable — show normal interview */
+    }
+  });
 
   async function toggleVoiceAnswer(index: number) {
     if (recordingFor() === index) {
@@ -38,6 +50,10 @@ export default function Interview() {
 
   return (
     <section class="panel">
+      <Show when={autoMode()}>
+        <p class="hint">Interview auto-mode is on — skipping questions…</p>
+      </Show>
+      <Show when={!autoMode()}>
       <h2>A few questions before the architecture</h2>
       <p class="hint">
         Answer what you can — answers sharpen the design. Skipping is fine; gaps become
@@ -81,6 +97,7 @@ export default function Interview() {
       </div>
       <Show when={state.busy}>
         <p class="hint">working…</p>
+      </Show>
       </Show>
     </section>
   );

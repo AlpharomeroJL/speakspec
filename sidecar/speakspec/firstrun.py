@@ -54,7 +54,10 @@ def recommend_tier(vram_gb: float | None) -> str:
 def handle_system_hardware(params: dict[str, Any], ctx: RequestContext) -> dict[str, Any]:
     """Full first-run hardware report (must complete within 5 seconds)."""
     asr = detect_hardware()
-    vram = detect_vram_gb()
+    config = get_config()
+    vram = config.get("vram_override_gb")
+    if vram is None:
+        vram = detect_vram_gb()
     client = OllamaClient(get_config()["ollama_url"])
     ollama_ok = True
     installed: list[dict] = []

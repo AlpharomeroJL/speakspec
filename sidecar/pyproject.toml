@@ -1,6 +1,6 @@
 [project]
 name = "speakspec-sidecar"
-version = "0.1.0"
+version = "1.0.0"
 description = "Speakspec AI inference sidecar: ASR (faster-whisper) + three-stage Ollama pipeline."
 requires-python = ">=3.11"
 license = { text = "MIT" }

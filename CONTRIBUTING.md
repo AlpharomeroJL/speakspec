@@ -9,7 +9,7 @@ Prerequisites: Rust stable (+ clippy, rustfmt), Node LTS + pnpm, Python 3.11+,
 Ollama running locally, and Node for the Mermaid validator.
 
 ```bash
-git clone https://github.com/joseflong/speakspec && cd speakspec
+git clone https://github.com/AlpharomeroJL/speakspec && cd speakspec
 pnpm install
 python -m venv sidecar/.venv
 sidecar/.venv/Scripts/python -m pip install -r sidecar/requirements-dev.txt
@@ -27,8 +27,10 @@ pnpm tauri dev
 | Python lint | `sidecar/.venv/Scripts/ruff check sidecar` |
 | Python tests | `cd sidecar && .venv/Scripts/python -m pytest` |
 | Frontend types | `pnpm exec tsc --noEmit` |
-| Mermaid release gate | `cd sidecar && .venv/Scripts/python tests/run_mermaid_corpus.py` |
-| AGENTS.md release gate | `cd sidecar && .venv/Scripts/python tests/run_agents_gate.py` |
+| Package runtime (release) | `pnpm package:runtime` |
+| All release gates | `powershell -ExecutionPolicy Bypass -File scripts/run-release-gates.ps1` |
+| Mermaid release gate | `sidecar/.venv/Scripts/python sidecar/tests/run_mermaid_corpus.py` |
+| AGENTS.md release gate | `sidecar/.venv/Scripts/python sidecar/tests/run_agents_gate.py` |
 
 House rules (enforced in CI): no `unwrap()`/`expect()` outside tests, no Clippy
 warnings, ruff clean, every public Rust fn documented, every Python function

@@ -62,10 +62,56 @@ export type Step =
   | "generating"
   | "results";
 
+/** Top-level view shown in the main area (sidebar navigation). */
+export type View = "wizard" | "library" | "setup" | "settings";
+
+/** The five built-in template presets (templates/presets.json). */
+export const TEMPLATES = [
+  "Solo MVP",
+  "API service",
+  "CLI tool",
+  "Browser extension",
+  "Data pipeline",
+] as const;
+
+/** Typed view of the Stage 2 architecture spec the Results screen renders. */
+export interface Stage2Spec {
+  system_overview: string;
+  recommended_language: {
+    language: string;
+    confidence: "high" | "medium" | "low";
+    rationale: string;
+    overridden_by_user: boolean;
+  };
+  quality_goals: Array<{ goal: string; driver: string }>;
+  architecture_decisions: Array<{
+    title: string;
+    chosen_option: string;
+    confidence: "high" | "medium" | "low";
+    rationale: string;
+    consequences: { positive: string[]; negative: string[] };
+    ruled_out: Array<{ option: string; rejection_reason: string }>;
+  }>;
+  oss_components: Array<{
+    name: string;
+    version: string;
+    purpose: string;
+    why_selected: string;
+  }>;
+  what_not_to_build: string[];
+  risk_flags: Array<{ risk: string; severity: "high" | "medium" | "low"; mitigation: string }>;
+  open_questions: string[];
+  complexity: { rating: "S" | "M" | "L" | "XL"; time_estimate: string; key_drivers: string[] };
+  constraints: string[];
+}
+
 export interface AppState {
   step: Step;
+  view: View;
   audioPath: string | null;
   sessionDir: string | null;
+  /** Recorded/imported audio duration in milliseconds, when known. */
+  durationMs: number | null;
   transcriptResult: TranscribeResult | null;
   /** The editable transcript; edits persist through the whole pipeline. */
   transcript: string;
@@ -87,8 +133,10 @@ export interface AppState {
 
 const [state, setState] = createStore<AppState>({
   step: "record",
+  view: "wizard",
   audioPath: null,
   sessionDir: null,
+  durationMs: null,
   transcriptResult: null,
   transcript: "",
   stage1: null,
@@ -107,12 +155,29 @@ const [state, setState] = createStore<AppState>({
 
 export { state };
 
+/** Switch the main-area view (sidebar navigation). */
+export function setView(view: View): void {
+  setState("view", view);
+}
+
+/** Store the known audio duration (from recording stop or transcription). */
+export function setDurationMs(ms: number | null): void {
+  setState("durationMs", ms);
+}
+
+/** Typed accessor for the Stage 2 spec (null until generated). */
+export function stage2Spec(): Stage2Spec | null {
+  return state.stage2 as unknown as Stage2Spec | null;
+}
+
 /** Reset to a fresh session (keeps nothing). */
 export function resetSession(): void {
   setState({
     step: "record",
+    view: "wizard",
     audioPath: null,
     sessionDir: null,
+    durationMs: null,
     transcriptResult: null,
     transcript: "",
     stage1: null,
@@ -262,6 +327,7 @@ export function openStoredSession(transcript: string, specJson: string, dir: str
       stage2: parsed.stage2 ?? null,
       stage3: parsed.stage3 ?? null,
       diagramReports: [],
+      view: "wizard",
       step: parsed.stage3 ? "results" : "record",
       error: parsed.stage3 ? null : "This session has no stored spec; start a new run.",
     });

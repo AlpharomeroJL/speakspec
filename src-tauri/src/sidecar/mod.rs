@@ -23,6 +23,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, oneshot, Mutex, Notify};
 
+use crate::config;
 use crate::error::AppError;
 use protocol::{SidecarErrorBody, SidecarMsg, SidecarRequest};
 
@@ -165,6 +166,13 @@ impl SidecarManager {
         self.request("cancel", json!({ "id": request_id })).await
     }
 
+    /// Restart the sidecar to pick up new settings or recover from a dead state.
+    pub async fn restart(&self) {
+        self.inner.kill_notify.notify_waiters();
+        tokio::time::sleep(SHUTDOWN_GRACE).await;
+        self.start().await;
+    }
+
     /// Close stdin (EOF makes the child exit), then kill it after a grace
     /// period. Called once on app exit.
     pub async fn shutdown(&self) {
@@ -194,8 +202,10 @@ impl SidecarManager {
             .arg("speakspec")
             .current_dir(workdir)
             .env("PYTHONUNBUFFERED", "1")
-            .env("PYTHONIOENCODING", "utf-8")
-            .stdin(std::process::Stdio::piped())
+            .env("PYTHONIOENCODING", "utf-8");
+        config::apply_runtime_env(&mut cmd, &self.inner.app);
+        config::apply_settings_env(&mut cmd, &self.inner.app);
+        cmd.stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
@@ -413,18 +423,22 @@ fn resolve_sidecar_paths(app: &AppHandle) -> Result<(PathBuf, PathBuf)> {
     }
 
     if let Ok(resource_dir) = app.path().resource_dir() {
-        let bundled = resource_dir.join("sidecar");
-        let python = bundled.join(venv_python_rel());
-        if python.exists() {
-            return Ok((python, bundled));
+        for bundled in [
+            resource_dir.join("speakspec-runtime").join("sidecar"),
+            resource_dir.join("sidecar"),
+        ] {
+            let python = bundled.join(venv_python_rel());
+            if python.exists() {
+                return Ok((python, bundled));
+            }
+            tried.push(format!("bundled layout: {}", python.display()));
         }
-        tried.push(format!("bundled layout: {}", python.display()));
     }
 
     Err(anyhow!(
         "No Python sidecar found. Tried: {}. \
-         Run the first-run setup, or set SPEAKSPEC_SIDECAR_PYTHON to a Python 3.11+ \
-         interpreter that has the speakspec sidecar installed.",
+         Reinstall Speakspec from the official installer, or set SPEAKSPEC_SIDECAR_PYTHON \
+         to a Python 3.11+ interpreter with the speakspec sidecar installed.",
         tried.join("; ")
     ))
 }

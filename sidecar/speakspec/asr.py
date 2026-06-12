@@ -23,21 +23,32 @@ CPU_MODEL = os.environ.get("SPEAKSPEC_ASR_CPU_MODEL", "small.en")
 _model_cache: dict[tuple[str, str], Any] = {}
 
 
+def _configured_asr_device() -> str:
+    """Return the configured ASR device preference (auto/cuda/cpu)."""
+    from speakspec.config import get_config
+
+    return str(get_config().get("asr_device", "auto")).lower()
+
+
 def detect_hardware() -> dict[str, Any]:
     """Pick the ASR device/model from the machine's capabilities."""
+    override = _configured_asr_device()
+    if override == "cpu":
+        return {"device": "cpu", "model": CPU_MODEL, "compute_type": "int8", "cuda_devices": 0}
     try:
         import ctranslate2
 
         cuda_devices = ctranslate2.get_cuda_device_count()
     except Exception:  # noqa: BLE001 - any probe failure means CPU path
         cuda_devices = 0
-    if cuda_devices > 0:
-        return {
-            "device": "cuda",
-            "model": GPU_MODEL,
-            "compute_type": "float16",
-            "cuda_devices": cuda_devices,
-        }
+    if override == "cuda" or cuda_devices > 0:
+        if cuda_devices > 0 or override == "cuda":
+            return {
+                "device": "cuda",
+                "model": GPU_MODEL,
+                "compute_type": "float16",
+                "cuda_devices": max(cuda_devices, 1 if override == "cuda" else 0),
+            }
     return {"device": "cpu", "model": CPU_MODEL, "compute_type": "int8", "cuda_devices": 0}
 
 

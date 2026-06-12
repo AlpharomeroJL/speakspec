@@ -210,7 +210,7 @@ def test_repair_loop_stubs_hopeless_source() -> None:
 
 
 @needs_parser
-def test_repair_loop_uses_model_before_sanitizer() -> None:
+def test_repair_loop_sanitizer_before_model() -> None:
     class FakeRepairClient:
         def __init__(self) -> None:
             self.calls = 0
@@ -221,6 +221,26 @@ def test_repair_loop_uses_model_before_sanitizer() -> None:
 
     client = FakeRepairClient()
     src = "graph TD\n  a[OAuth (Google)] --> b[End]"
+    final, report = repair_diagram(
+        "component", src, validator=validator, client=client, model="fake"
+    )
+    assert client.calls == 0
+    assert report["status"] == "sanitized"
+    assert validator.check(final)["ok"]
+
+
+@needs_parser
+def test_repair_loop_uses_model_when_sanitizer_insufficient() -> None:
+    class FakeRepairClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def chat_structured(self, **kwargs) -> str:
+            self.calls += 1
+            return '{"mermaid": "graph TD\\n  a[Fixed] --> b[End]"}'
+
+    client = FakeRepairClient()
+    src = "graph TD\n  ]][[ totally broken &&& --> ((("
     final, report = repair_diagram(
         "component", src, validator=validator, client=client, model="fake"
     )

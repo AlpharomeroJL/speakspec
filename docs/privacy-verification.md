@@ -45,3 +45,14 @@ pipeline run with no cloud key configured**, except localhost traffic.
 
 Record the capture file hash alongside the release notes when checking the
 release-blocker box.
+
+## Cloud Stage 3 verification (second capture)
+
+When the user enables cloud Stage 3 and saves an API key in Settings:
+
+1. Repeat steps 1–5 above with cloud Stage 3 enabled and a valid key.
+2. **Pass criteria:** the only non-localhost traffic attributable to Speakspec
+   is HTTPS to the configured provider (OpenAI or Anthropic). No audio bytes
+   leave the machine; only architecture-spec text from Stage 3.
+3. Mermaid diagram repair and local Ollama calls (if any) remain on localhost.
+4. Archive this capture separately with its SHA-256 hash.

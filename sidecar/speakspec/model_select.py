@@ -9,9 +9,13 @@ matching an installed model, else the largest installed model.
 import json
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from speakspec.config import repo_root
 from speakspec.messages import SidecarError
+
+if TYPE_CHECKING:
+    from speakspec.ollama_client import OllamaClient
 
 
 def models_config_path() -> Path:
@@ -76,3 +80,51 @@ def choose_model(
 
     largest = max(installed, key=lambda m: m.get("size", 0))
     return largest["name"]
+
+
+def choose_fast_model(
+    installed: list[dict],
+    preferred: str | None = None,
+    vram_gb: float | None = None,
+) -> str:
+    """Pick the best installed model from the fast_fallback tier."""
+    if not installed:
+        raise SidecarError(
+            "no-models-installed",
+            "No Ollama models are installed. Pull a fast fallback model "
+            "(Phi-4-mini or Gemma 4 4B class) before enabling fast pipeline.",
+        )
+    tiers = load_model_tiers()
+    tier = tiers.get("fast_fallback", {})
+    for pattern in tier.get("patterns", []):
+        for model in installed:
+            if _matches(model["name"], pattern):
+                return model["name"]
+    return choose_model(installed, preferred=preferred, vram_gb=vram_gb)
+
+
+def resolve_stage_model(
+    stage: int,
+    explicit: str | None,
+    client: "OllamaClient",  # noqa: F821
+) -> str:
+    """Resolve the model for a pipeline stage, honoring fast_pipeline settings."""
+    from speakspec.config import get_config
+
+    config = get_config()
+    installed = client.list_models()
+    preferred = explicit or config.get("default_model")
+    if config.get("fast_pipeline") and stage in (1, 3):
+        return choose_fast_model(installed, preferred=preferred)
+    return choose_model(installed, preferred=preferred)
+
+
+def resolve_repair_model(client: "OllamaClient") -> str:  # noqa: F821
+    """Pick a small fast model for diagram repair calls."""
+    from speakspec.config import get_config
+
+    config = get_config()
+    installed = client.list_models()
+    if config.get("fast_pipeline"):
+        return choose_fast_model(installed, preferred=config.get("default_model"))
+    return choose_fast_model(installed, preferred=config.get("default_model"))

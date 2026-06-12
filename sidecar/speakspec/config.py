@@ -17,6 +17,18 @@ DEFAULTS: dict[str, Any] = {
     # Bounds for the always-explicit num_ctx (see pipeline.size_num_ctx).
     "num_ctx_min": 8192,
     "num_ctx_max": 32768,
+    # ASR device override: auto, cuda, or cpu.
+    "asr_device": "auto",
+    # Manual VRAM override for tier recommendation (GB).
+    "vram_override_gb": None,
+    # Skip interview questions automatically when true.
+    "interview_auto_mode": False,
+    # Optional cloud Stage 3 (off by default).
+    "cloud_stage3_enabled": False,
+    "cloud_provider": "openai",
+    "cloud_api_key": None,
+    # Use fast_fallback tier models for S1/S3/repairs when true.
+    "fast_pipeline": False,
 }
 
 _ENV_KEYS = {

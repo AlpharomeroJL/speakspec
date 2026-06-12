@@ -101,7 +101,7 @@ Speakspec is MIT and community-extensible by design — prompt templates
 (`templates/oss-knowledge-base.json`), and the tech-vocab dictionary
 (`dicts/tech-vocab.json`) are plain JSON: no code changes needed. See
 [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Good First Issues](https://github.com/joseflong/speakspec/labels/good%20first%20issue).
+[Good First Issues](https://github.com/AlpharomeroJL/speakspec/labels/good%20first%20issue).
 
 ## Generated output & copyright
 

@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  rust:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Clippy
+        run: cd src-tauri && cargo clippy --all-targets -- -D warnings
+      - name: Tests
+        run: cd src-tauri && cargo test
+
+  python:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install sidecar
+        run: |
+          python -m venv sidecar/.venv
+          sidecar/.venv/Scripts/python -m pip install -r sidecar/requirements-dev.txt
+          sidecar/.venv/Scripts/python -m pip install -e sidecar --no-deps
+      - name: Ruff
+        run: sidecar/.venv/Scripts/ruff check sidecar
+      - name: Pytest
+        run: sidecar/.venv/Scripts/python -m pytest
+        working-directory: sidecar
+
+  frontend:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+  release-gates:
+    runs-on: windows-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Setup
+        run: |
+          python -m venv sidecar/.venv
+          sidecar/.venv/Scripts/python -m pip install -r sidecar/requirements-dev.txt
+          sidecar/.venv/Scripts/python -m pip install -e sidecar --no-deps
+          cd tools/mermaid-validate && pnpm install
+      - name: Mermaid corpus gate
+        run: sidecar/.venv/Scripts/python tests/run_mermaid_corpus.py
+      - name: AGENTS.md gate
+        run: sidecar/.venv/Scripts/python tests/run_agents_gate.py

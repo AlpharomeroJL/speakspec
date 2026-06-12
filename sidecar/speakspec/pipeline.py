@@ -14,9 +14,10 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from speakspec import prompts
+from speakspec.cloud_client import CloudClient
 from speakspec.config import get_config, templates_dir
 from speakspec.messages import SidecarError
-from speakspec.model_select import choose_model
+from speakspec.model_select import choose_model, resolve_repair_model, resolve_stage_model
 from speakspec.ollama_client import OllamaClient
 from speakspec.rpc import RequestContext
 from speakspec.schemas import STAGE_MODELS, ConstraintExtraction, OutputBundle, load_stage_schema
@@ -152,6 +153,62 @@ def run_stage(
         "stage-validation-failed",
         f"Stage {stage} output failed validation after {MAX_RETRIES} retries. "
         f"Last error: {last_error[:500]}",
+        {"stage": stage},
+    )
+
+
+def run_stage_cloud(
+    stage: int,
+    user_message: str,
+    *,
+    cloud: CloudClient,
+    model: str,
+    ctx: RequestContext | None = None,
+    context: dict[str, Any] | None = None,
+) -> BaseModel:
+    """Run Stage 3 via a cloud provider instead of local Ollama."""
+    schema = load_stage_schema(stage)
+    system = prompts.system_prompt(stage)
+    model_cls = STAGE_MODELS[stage]
+    temperature = 0.2
+
+    on_token = ctx.emit_token if ctx is not None else None
+    cancelled = ctx.check_cancelled if ctx is not None else None
+    if ctx is not None:
+        ctx.emit_progress({"stage": stage, "state": "calling-cloud", "model": model})
+
+    message = user_message
+    last_error = "unknown"
+    for attempt in range(1 + MAX_RETRIES):
+        if cancelled is not None and cancelled():
+            raise SidecarError("cancelled", "The pipeline was cancelled.")
+        text = cloud.chat_structured(
+            model=model,
+            system=system,
+            user=message,
+            schema=schema,
+            temperature=temperature,
+            on_token=on_token,
+            cancelled=cancelled,
+        )
+        try:
+            parsed = model_cls.model_validate(json.loads(text))
+            semantic_check(stage, parsed, context)
+            return parsed
+        except (json.JSONDecodeError, ValidationError, ValueError) as exc:
+            last_error = str(exc)
+            logger.warning("cloud stage %d attempt %d failed: %s", stage, attempt + 1, exc)
+            if ctx is not None:
+                ctx.emit_progress({"stage": stage, "state": "retrying", "attempt": attempt + 1})
+            message = (
+                f"{user_message}\n\n"
+                f"YOUR PREVIOUS OUTPUT FAILED VALIDATION WITH THIS ERROR:\n{last_error}\n"
+                f"Fix only the invalid fields and re-emit the complete JSON object."
+            )
+
+    raise SidecarError(
+        "stage-validation-failed",
+        f"Cloud stage {stage} failed validation after {MAX_RETRIES} retries.",
         {"stage": stage},
     )
 
@@ -332,7 +389,7 @@ def handle_stage1(params: dict[str, Any], ctx: RequestContext) -> dict[str, Any]
     if not transcript.strip():
         raise SidecarError("empty-transcript", "There is no transcript text to analyze.")
     client = make_client()
-    model = resolve_model(params.get("model"), client)
+    model = resolve_stage_model(1, params.get("model"), client)
     result = run_stage(
         1,
         stage1_message(transcript, params.get("interview_answers", "")),
@@ -373,21 +430,39 @@ def handle_stage3(params: dict[str, Any], ctx: RequestContext) -> dict[str, Any]
     if not spec:
         raise SidecarError("missing-spec", "Stage 3 needs the Stage 2 architecture spec.")
     client = make_client()
-    model = resolve_model(params.get("model"), client)
     spec_json = json.dumps(spec, indent=1)
-    result = run_stage(
-        3,
-        stage3_message(spec_json),
-        client=client,
-        model=model,
-        ctx=ctx,
+    cloud = CloudClient.from_config()
+    if cloud is not None:
+        cloud_model = params.get("cloud_model") or "gpt-4o-mini"
+        result = run_stage_cloud(
+            3,
+            stage3_message(spec_json),
+            cloud=cloud,
+            model=cloud_model,
+            ctx=ctx,
+        )
+        model = f"cloud:{cloud_model}"
+        repair_model = resolve_repair_model(client)
+        agents_model = repair_model
+    else:
+        model = resolve_stage_model(3, params.get("model"), client)
+        result = run_stage(
+            3,
+            stage3_message(spec_json),
+            client=client,
+            model=model,
+            ctx=ctx,
+        )
+        repair_model = resolve_repair_model(client)
+        agents_model = repair_model
+    result = ensure_real_agents_md(
+        result, spec_json, client=client, model=agents_model, ctx=ctx
     )
-    result = ensure_real_agents_md(result, spec_json, client=client, model=model, ctx=ctx)
     ctx.emit_progress({"stage": 3, "state": "validating-diagrams"})
     finals, reports = validate_and_repair_bundle(
         result.diagrams.model_dump(),
         client=client,
-        model=model,
+        model=repair_model,
         on_progress=lambda d: ctx.emit_progress({"stage": 3, **d}),
     )
     bundle = result.model_dump()

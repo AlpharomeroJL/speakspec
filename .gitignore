@@ -1,5 +1,7 @@
 node_modules
 dist
+src-tauri/resources/speakspec-runtime/*
+!src-tauri/resources/speakspec-runtime/.keep
 
 # Python sidecar
 sidecar/.venv/

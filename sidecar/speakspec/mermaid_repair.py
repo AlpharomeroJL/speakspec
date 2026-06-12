@@ -26,6 +26,7 @@ import re
 import shutil
 import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 DIAGRAM_KINDS = ("sequence", "er", "component", "c4_context", "c4_container")
 
-MAX_MODEL_REPAIRS = 3
+MAX_MODEL_REPAIRS = 1
 
 REPAIR_SYSTEM_PROMPT = (
     "You rewrite invalid Mermaid 11 diagrams into valid Mermaid 11 syntax. "
@@ -576,6 +577,16 @@ def repair_diagram(
         return src, report
     report["errors"].append(verdict.get("error", ""))
 
+    # Sanitizer-first: deterministic fixes before any model call.
+    for candidate in (src, normalize_frame(source)):
+        sanitized = sanitize(candidate, kind)
+        verdict = validator.check(sanitized)
+        if verdict["ok"]:
+            report["status"] = "sanitized"
+            return sanitized, report
+        report["errors"].append(verdict.get("error", ""))
+        src = sanitized
+
     if client is not None and model:
         for attempt in range(1, MAX_MODEL_REPAIRS + 1):
             if on_progress is not None:
@@ -589,18 +600,14 @@ def repair_diagram(
                 report["status"] = "repaired"
                 return repaired, report
             report["errors"].append(verdict.get("error", ""))
+            for candidate in (repaired, normalize_frame(source)):
+                sanitized = sanitize(candidate, kind)
+                verdict = validator.check(sanitized)
+                if verdict["ok"]:
+                    report["status"] = "sanitized"
+                    return sanitized, report
+                report["errors"].append(verdict.get("error", ""))
             src = repaired
-
-    # Sanitize the last repair output, and fall back to sanitizing the
-    # ORIGINAL source — model repairs can mangle a dialect the structural
-    # converters would have handled.
-    for candidate in (src, normalize_frame(source)):
-        sanitized = sanitize(candidate, kind)
-        verdict = validator.check(sanitized)
-        if verdict["ok"]:
-            report["status"] = "sanitized"
-            return sanitized, report
-        report["errors"].append(verdict.get("error", ""))
 
     report["status"] = "stubbed"
     report["original_source"] = source
@@ -615,11 +622,12 @@ def validate_and_repair_bundle(
     model: str | None = None,
     on_progress=None,
 ) -> tuple[dict[str, str], list[dict[str, Any]]]:
-    """Repair all five diagrams; return (final diagrams, per-diagram reports)."""
+    """Repair all five diagrams in parallel; return (final diagrams, per-diagram reports)."""
     validator = get_validator()
     finals: dict[str, str] = {}
     reports: list[dict[str, Any]] = []
-    for kind in DIAGRAM_KINDS:
+
+    def work(kind: str) -> tuple[str, str, dict[str, Any]]:
         final, report = repair_diagram(
             kind,
             diagrams.get(kind, ""),
@@ -628,6 +636,13 @@ def validate_and_repair_bundle(
             model=model,
             on_progress=on_progress,
         )
-        finals[kind] = final
-        reports.append(report)
+        return kind, final, report
+
+    with ThreadPoolExecutor(max_workers=len(DIAGRAM_KINDS)) as pool:
+        futures = [pool.submit(work, kind) for kind in DIAGRAM_KINDS]
+        for future in as_completed(futures):
+            kind, final, report = future.result()
+            finals[kind] = final
+            reports.append(report)
+    reports.sort(key=lambda r: DIAGRAM_KINDS.index(r["kind"]))
     return finals, reports
