@@ -90,8 +90,8 @@ transcript text only, never audio. Off by default.
 
 ## Star history
 
-<a href="https://star-history.com/#joseflong/speakspec&Date">
-  <img src="https://api.star-history.com/svg?repos=joseflong/speakspec&type=Date" alt="Star history chart" width="600" />
+<a href="https://star-history.com/#AlpharomeroJL/speakspec&Date">
+  <img src="https://api.star-history.com/svg?repos=AlpharomeroJL/speakspec&type=Date" alt="Star history chart" width="600" />
 </a>
 
 ## Contributing
